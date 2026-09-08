@@ -1,4 +1,4 @@
-# Generated from Express.g4 by ANTLR 4.13.2
+# Generated from specification/inference_formats/express/Express.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .express_parser import ExpressParser

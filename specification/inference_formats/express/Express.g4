@@ -26,7 +26,7 @@ statement
  * Assigns an expression to a variable or a data path target.
  */
 assignment
-    : (identifier | path) '=' expression
+    : (identifier | path) ('=' | ':') expression
     ;
 
 /**
@@ -62,7 +62,7 @@ map
  * A single key-value entry within a map literal.
  */
 map_entry
-    : (identifier | string) ':' expression
+    : (identifier | string) ('=' | ':') expression
     ;
 
 /**
@@ -94,10 +94,10 @@ arg
     ;
 
 /**
- * A named argument assignment (e.g. 'variant = "primary"').
+ * A named argument assignment (e.g. 'variant = "primary"' or 'variant: "primary"').
  */
 named_arg
-    : identifier '=' expression
+    : (identifier | string) ('=' | ':') expression
     ;
 
 /**
@@ -116,6 +116,7 @@ literal
     | NUMBER
     | BOOLEAN
     | 'null'
+    | ELLIPSIS
     ;
 
 /**
@@ -133,8 +134,12 @@ identifier
 string
     : RAW_TRIPLE_STRING
     | TRIPLE_STRING
+    | RAW_TRIPLE_SINGLE_STRING
+    | TRIPLE_SINGLE_STRING
     | RAW_STRING
     | STANDARD_STRING
+    | RAW_SINGLE_STRING
+    | SINGLE_STRING
     ;
 
 // =============================================================================
@@ -142,10 +147,17 @@ string
 // =============================================================================
 
 // String literals: must match triple-quoted forms before single-quoted forms.
-RAW_TRIPLE_STRING : [rR] '"""' .*? '"""' ;
-TRIPLE_STRING     : '"""' ( '\\' . | ~'\\' )*? '"""' ;
-RAW_STRING        : [rR] '"' ~[\r\n"]* '"' ;
-STANDARD_STRING   : '"' ( '\\' . | ~'\\' )*? '"' ;
+RAW_TRIPLE_STRING        : [rR] '"""' .*? '"""' ;
+TRIPLE_STRING            : '"""' ( '\\' . | ~'\\' )*? '"""' ;
+RAW_TRIPLE_SINGLE_STRING : [rR] '\'\'\'' .*? '\'\'\'' ;
+TRIPLE_SINGLE_STRING     : '\'\'\'' ( '\\' . | ~'\\' )*? '\'\'\'' ;
+RAW_STRING               : [rR] '"' ~[\r\n"]* '"' ;
+STANDARD_STRING          : '"' ( '\\' . | ~'\\' )*? '"' ;
+RAW_SINGLE_STRING        : [rR] '\'' ~[\r\n']* '\'' ;
+SINGLE_STRING            : '\'' ( '\\' . | ~'\\' )*? '\'' ;
+
+// Ellipsis placeholder
+ELLIPSIS                 : '...' ;
 
 // Data path literal (e.g. '$/user/id')
 PATH : '$' [a-zA-Z0-9_/]* ;

@@ -289,6 +289,7 @@ class ExpressCompiler:
         current_scope: Optional[_SurfaceScope] = None
         target_delete_surface_id = None
         standalone_function_calls = []
+        top_level_components = []
 
         for stmt in statements:
             stmt_type, *stmt_args = stmt
@@ -339,7 +340,16 @@ class ExpressCompiler:
                     ):
                         target_delete_surface_id = kwargs["surfaceId"]
                 elif isinstance(parsed_val, dict) and "call" in parsed_val:
-                    standalone_function_calls.append((parsed_val, current_scope))
+                    call_name = parsed_val["call"]
+                    if self.helper.is_component(call_name):
+                        if current_scope is None:
+                            current_scope = _SurfaceScope(
+                                surface_id=surface_id, catalog_id=catalog_id
+                            )
+                            scopes.append(current_scope)
+                        top_level_components.append(parsed_val)
+                    else:
+                        standalone_function_calls.append((parsed_val, current_scope))
             elif stmt_type == "ASSIGN":
                 var_name, parsed_val = stmt_args
                 if current_scope is None:
@@ -348,9 +358,32 @@ class ExpressCompiler:
                     )
                     scopes.append(current_scope)
                 if var_name.startswith("$"):
-                    current_scope.data_path_assignments[var_name] = parsed_val
+                    if isinstance(parsed_val, dict) and self.helper.is_component(
+                        parsed_val.get("call", "")
+                    ):
+                        clean_var = var_name.lstrip("$").lstrip("/")
+                        current_scope.raw_symbols[clean_var] = parsed_val
+                        current_scope.raw_symbols[var_name] = parsed_val
+                    else:
+                        current_scope.data_path_assignments[var_name] = parsed_val
                 else:
                     current_scope.raw_symbols[var_name] = parsed_val
+
+        # Detect implicit root from top-level component statements
+        if top_level_components:
+            if current_scope is None:
+                current_scope = _SurfaceScope(
+                    surface_id=surface_id, catalog_id=catalog_id
+                )
+                scopes.append(current_scope)
+            if "root" not in current_scope.raw_symbols:
+                if len(top_level_components) == 1:
+                    current_scope.raw_symbols["root"] = top_level_components[0]
+                else:
+                    current_scope.raw_symbols["root"] = {
+                        "call": "Column",
+                        "args": [top_level_components],
+                    }
 
         if target_delete_surface_id is not None:
             return [{
@@ -464,6 +497,84 @@ class ExpressCompiler:
 
         return result_messages
 
+    def _detect_and_unpack_kv_args(
+        self, comp_name: str, var_name: str, args: list[Any], kwargs: dict[str, Any]
+    ) -> tuple[Optional[str], list[Any], dict[str, Any]]:
+        """Permissively detects and unpacks alternating key-value argument sequences.
+
+        Handles small model patterns like:
+        TextField("usernameField", "label", "Username", "value", {"path": ...})
+        or Button("signInButton", "label", "Sign In", "event", {...})
+        or TextField("usernameField", label="Username", ...)
+        """
+        extracted_id = None
+        new_kwargs = dict(kwargs)
+
+        # 1. Check for explicit id in kwargs
+        for id_key in ("id", "componentId", "component_id"):
+            if id_key in new_kwargs:
+                extracted_id = str(new_kwargs.pop(id_key))
+                break
+
+        if not args:
+            return extracted_id, args, new_kwargs
+
+        properties = self.helper.get_component_properties(comp_name)
+        non_check_props = [p for p in properties if p != "checks"]
+        first_prop = non_check_props[0] if non_check_props else None
+
+        is_anon_or_inline = var_name.startswith("_anon_comp_") or var_name.startswith("_inline_")
+
+        # 2. Check if args[0] is an explicit component ID because first_prop is already in kwargs
+        if (
+            is_anon_or_inline
+            and not extracted_id
+            and len(args) >= 1
+            and isinstance(args[0], str)
+            and first_prop
+            and any(
+                self.helper.get_canonical_property_name(comp_name, k) == first_prop
+                for k in new_kwargs
+            )
+        ):
+            extracted_id = str(args[0])
+            args = args[1:]
+
+        if not args or len(args) < 2:
+            return extracted_id, args, new_kwargs
+
+        def is_prop_cand(val: Any) -> bool:
+            if not isinstance(val, str):
+                return False
+            canon = self.helper.get_canonical_property_name(comp_name, val)
+            if canon is not None:
+                return True
+            return val.lower() in (
+                "label", "text", "value", "type", "variant", "placeholder",
+                "event", "action", "child", "children", "items", "icon", "url",
+                "src", "checked", "weight", "axis", "align", "justify"
+            )
+
+        # Case A: arg[0] is ID, followed by key-value pairs (len is odd >= 3)
+        if len(args) >= 3 and len(args) % 2 == 1 and isinstance(args[0], str):
+            if is_prop_cand(args[1]) and (
+                (len(args) == 3 and not is_prop_cand(args[0]))
+                or (len(args) >= 5 and is_prop_cand(args[3]))
+            ):
+                id_val = str(args[0])
+                for i in range(1, len(args), 2):
+                    new_kwargs[str(args[i])] = args[i + 1]
+                return id_val or extracted_id, [], new_kwargs
+
+        # Case B: no ID, alternating key-value pairs (len is even >= 4)
+        if len(args) >= 4 and len(args) % 2 == 0 and isinstance(args[0], str):
+            if is_prop_cand(args[0]) and is_prop_cand(args[2]):
+                for i in range(0, len(args), 2):
+                    new_kwargs[str(args[i])] = args[i + 1]
+                return extracted_id, [], new_kwargs
+
+        return extracted_id, args, new_kwargs
+
     def _compile_ast_node(
         self, var_name: str, ast: Any, raw_symbols: dict, ctx: _CompileContext
     ) -> Optional[dict]:
@@ -478,16 +589,32 @@ class ExpressCompiler:
         Returns:
             The compiled component JSON dictionary, or None if it is not a component.
         """
-        if not isinstance(ast, dict) or "call" not in ast:
+        # Follow variable aliases (e.g. root = productList)
+        resolved_ast = ast
+        while isinstance(resolved_ast, dict) and "variable" in resolved_ast:
+            var_target = resolved_ast["variable"]
+            if var_target in raw_symbols:
+                resolved_ast = raw_symbols[var_target]
+            elif var_target.lstrip("$").lstrip("/") in raw_symbols:
+                resolved_ast = raw_symbols[var_target.lstrip("$").lstrip("/")]
+            else:
+                break
+
+        if not isinstance(resolved_ast, dict) or "call" not in resolved_ast:
             return None
 
-        comp_name = ast["call"]
-        args = ast.get("args", [])
-        kwargs = ast.get("kwargs", {})
-
-        if comp_name not in self.helper.components:
+        raw_call = resolved_ast["call"]
+        comp_name = self.helper.get_canonical_component_name(raw_call)
+        if not comp_name or comp_name not in self.helper.components:
             # Not a component, could be a standalone action/helper; skip writing as component
             return None
+
+        args = list(resolved_ast.get("args", []))
+        kwargs = dict(resolved_ast.get("kwargs", {}))
+
+        id_override, args, kwargs = self._detect_and_unpack_kv_args(comp_name, var_name, args, kwargs)
+        if id_override and (var_name.startswith("_anon_comp_") or var_name.startswith("_inline_")):
+            var_name = id_override
 
         properties = self.helper.get_component_properties(comp_name)
         comp_dict = {"id": var_name, "component": comp_name}
@@ -497,6 +624,54 @@ class ExpressCompiler:
 
         non_check_properties = [p for p in properties if p != "checks"]
         raw_checks = []
+
+        # Special case: List($/path, template, "direction")
+        if comp_name == "List" and len(args) >= 2:
+            first_arg = args[0]
+            second_arg = args[1]
+            if isinstance(first_arg, dict) and "path" in first_arg:
+                template_comp_id = self._compile_value(second_arg, raw_symbols, ctx)
+                args = [
+                    {"path": first_arg["path"], "componentId": template_comp_id},
+                    *args[2:],
+                ]
+
+        # Special case: Variadic children for components with ChildList (Column, Row, etc.)
+        child_list_prop = None
+        for p in non_check_properties:
+            if self.helper.get_property_type(comp_name, p) == "ChildList":
+                child_list_prop = p
+                break
+
+        if child_list_prop and child_list_prop == non_check_properties[0]:
+            if args:
+                first_arg = args[0]
+                is_template = (
+                    isinstance(first_arg, dict)
+                    and (
+                        "path" in first_arg
+                        or "componentId" in first_arg
+                        or first_arg.get("call") == "_template"
+                    )
+                )
+                if not isinstance(first_arg, list) and not is_template:
+                    if (
+                        len(args) == 2
+                        and isinstance(args[1], (int, float))
+                        and "weight" in non_check_properties
+                    ):
+                        args = [[first_arg], args[1]]
+                    else:
+                        packed = []
+                        non_packed = []
+                        for a in args:
+                            if _is_check_expression(a):
+                                non_packed.append(a)
+                            elif isinstance(a, list):
+                                packed.extend(a)
+                            else:
+                                packed.append(a)
+                        args = [packed] + non_packed
 
         # Collect (prop_name, arg_val) pairs from positional and keyword args
         prop_arg_pairs = []
@@ -509,8 +684,37 @@ class ExpressCompiler:
                     raw_checks.append(arg)
                 continue
 
+            is_action_arg = (
+                isinstance(arg, dict)
+                and (
+                    "event" in arg
+                    or "functionCall" in arg
+                    or (
+                        "call" in arg
+                        and not self.helper.is_component(arg["call"])
+                    )
+                )
+            )
+
             if prop_idx < len(non_check_properties):
-                prop_arg_pairs.append((non_check_properties[prop_idx], arg))
+                curr_prop = non_check_properties[prop_idx]
+                curr_prop_type = self.helper.get_property_type(comp_name, curr_prop)
+
+                if is_action_arg and curr_prop_type != "Action":
+                    action_prop = None
+                    for p_cand in non_check_properties[prop_idx:]:
+                        if (
+                            self.helper.get_property_type(comp_name, p_cand)
+                            == "Action"
+                        ):
+                            action_prop = p_cand
+                            break
+                    if action_prop:
+                        prop_arg_pairs.append((action_prop, arg, action_prop))
+                        prop_idx += 1
+                        continue
+
+                prop_arg_pairs.append((curr_prop, arg, curr_prop))
                 prop_idx += 1
 
         for k, v in kwargs.items():
@@ -520,25 +724,119 @@ class ExpressCompiler:
                 else:
                     raw_checks.append(v)
                 continue
-            prop_arg_pairs.append((k, v))
+            canon_k = self.helper.get_canonical_property_name(comp_name, k)
+            if canon_k is None or canon_k not in properties:
+                raise ExpressUnknownPropertyError(comp_name, k, properties)
+            prop_arg_pairs.append((canon_k, v, k))
 
         seen_properties = set()
-        for prop_name, arg in prop_arg_pairs:
-            if prop_name not in properties:
-                raise ExpressUnknownPropertyError(comp_name, prop_name, properties)
-            if prop_name in seen_properties:
+        for prop_name, arg, orig_name in prop_arg_pairs:
+            canon_p = (
+                self.helper.get_canonical_property_name(comp_name, prop_name)
+                or prop_name
+            )
+            if canon_p in seen_properties:
                 raise ExpressDuplicatePropertyError(comp_name, prop_name)
-            seen_properties.add(prop_name)
+            seen_properties.add(canon_p)
+            prop_name = canon_p
             if arg == {"skipped": True}:
                 comp_dict[prop_name] = None
                 continue
 
+            prop_type = self.helper.get_property_type(comp_name, prop_name)
             mapped_val = self._compile_value(
                 arg,
                 raw_symbols,
                 ctx,
-                is_action=(prop_name in ["action", "submitAction"]),
+                is_action=(
+                    prop_name in ["action", "submitAction"]
+                    or prop_type == "Action"
+                ),
             )
+
+            known_ids = set(raw_symbols.keys()) | {
+                c.get("id") for c in ctx.extra_components
+            }
+
+            # Auto-wrap string child to Text component if property expects Child and was passed as label/text synonym
+            if prop_type == "Child":
+                if (
+                    isinstance(mapped_val, str)
+                    and mapped_val not in known_ids
+                    and not mapped_val.startswith("_inline_")
+                    and orig_name.lower() in ("label", "text", "title")
+                ):
+                    ctx.inline_counter += 1
+                    inline_id = f"_inline_{ctx.inline_counter}"
+                    ctx.extra_components.append({
+                        "id": inline_id,
+                        "component": "Text",
+                        "text": mapped_val,
+                    })
+                    mapped_val = inline_id
+
+            # Auto-wrap string items in ChildList to Text component
+            if prop_type == "ChildList" and isinstance(mapped_val, list):
+                wrapped_list = []
+                for item in mapped_val:
+                    if (
+                        isinstance(item, str)
+                        and item not in known_ids
+                        and not item.startswith("_inline_")
+                        and (" " in item or "\n" in item)
+                    ):
+                        ctx.inline_counter += 1
+                        inline_id = f"_inline_{ctx.inline_counter}"
+                        ctx.extra_components.append({
+                            "id": inline_id,
+                            "component": "Text",
+                            "text": item,
+                        })
+                        wrapped_list.append(inline_id)
+                    else:
+                        wrapped_list.append(item)
+                mapped_val = wrapped_list
+
+            # Handle Tabs component tabs array
+            if (
+                comp_name == "Tabs"
+                and prop_name == "tabs"
+                and isinstance(mapped_val, list)
+            ):
+                fixed_tabs = []
+                for tab_item in mapped_val:
+                    if isinstance(tab_item, str):
+                        ctx.inline_counter += 1
+                        inline_id = f"_inline_{ctx.inline_counter}"
+                        ctx.extra_components.append({
+                            "id": inline_id,
+                            "component": "Text",
+                            "text": tab_item,
+                        })
+                        fixed_tabs.append({"title": tab_item, "child": inline_id})
+                    elif isinstance(tab_item, dict):
+                        tab_dict = dict(tab_item)
+                        if "content" in tab_dict and "child" not in tab_dict:
+                            c_val = tab_dict.pop("content")
+                            tab_dict["child"] = (
+                                c_val[0]
+                                if isinstance(c_val, list) and c_val
+                                else c_val
+                            )
+                        if "child" not in tab_dict or not tab_dict["child"]:
+                            ctx.inline_counter += 1
+                            inline_id = f"_inline_{ctx.inline_counter}"
+                            ctx.extra_components.append({
+                                "id": inline_id,
+                                "component": "Text",
+                                "text": tab_dict.get("title", ""),
+                            })
+                            tab_dict["child"] = inline_id
+                        fixed_tabs.append(tab_dict)
+                    else:
+                        fixed_tabs.append(tab_item)
+                mapped_val = fixed_tabs
+
             prop_schema = self.helper.get_property_schema(comp_name, prop_name)
             if prop_schema and not _schema_allows_databinding(prop_schema):
                 if _has_databinding(mapped_val):
@@ -552,7 +850,30 @@ class ExpressCompiler:
                     ]
             enum_vals = self.helper.get_property_enum(comp_name, prop_name)
             if enum_vals and isinstance(mapped_val, str):
-                if mapped_val not in enum_vals:
+                lower_map = {e.lower(): e for e in enum_vals}
+                mapped_lower = mapped_val.lower()
+                enum_synonyms = {
+                    "password": "obscured",
+                    "text": "shortText",
+                    "multiline": "longText",
+                    "textarea": "longText",
+                    "int": "number",
+                    "integer": "number",
+                    "numeric": "number",
+                    "horizontal": "row",
+                    "vertical": "column",
+                    "left": "start",
+                    "right": "end",
+                    "center": "center",
+                }
+                if mapped_lower in lower_map:
+                    mapped_val = lower_map[mapped_lower]
+                elif (
+                    mapped_lower in enum_synonyms
+                    and enum_synonyms[mapped_lower].lower() in lower_map
+                ):
+                    mapped_val = lower_map[enum_synonyms[mapped_lower].lower()]
+                else:
                     raise ValueError(
                         f"Value '{mapped_val}' is not a valid enum choice for"
                         f" property '{prop_name}' of component '{comp_name}'."
@@ -634,6 +955,13 @@ class ExpressCompiler:
             if compiled_checks:
                 comp_dict["checks"] = compiled_checks
 
+        # Provide sensible defaults for missing required properties (e.g. Slider value/max)
+        if comp_name == "Slider":
+            if "value" not in comp_dict or comp_dict["value"] is None:
+                comp_dict["value"] = 0
+            if "max" not in comp_dict or comp_dict["max"] is None:
+                comp_dict["max"] = 100
+
         ctx.active_value_path = None
         return {k: v for k, v in comp_dict.items() if v is not None}
 
@@ -656,15 +984,21 @@ class ExpressCompiler:
                 return val
             if "variable" in val:
                 ref_name = val["variable"]
-                if ref_name in raw_symbols:
-                    symbol_val = raw_symbols[ref_name]
+                clean_ref = ref_name.lstrip("$").lstrip("/")
+                lookup_key = (
+                    ref_name
+                    if ref_name in raw_symbols
+                    else (clean_ref if clean_ref in raw_symbols else None)
+                )
+                if lookup_key:
+                    symbol_val = raw_symbols[lookup_key]
                     if (
                         isinstance(symbol_val, dict)
-                        and symbol_val.get("call") in self.helper.components
+                        and self.helper.is_component(symbol_val.get("call", ""))
                     ):
-                        return ref_name
+                        return lookup_key
                     return self._compile_value(symbol_val, raw_symbols, ctx, is_action)
-                return ref_name
+                return clean_ref or ref_name
             if "check" in val:
                 check_name = val["check"]
                 check_args = val["args"]
@@ -711,20 +1045,25 @@ class ExpressCompiler:
 
                 return {"call": check_name, "args": compiled_args}
             if "call" in val:
-                # Nested function call (e.g. formatString or actions)
-                fn_name = val["call"]
-                fn_args = val["args"]
+                raw_call = val["call"]
+                canon_comp = self.helper.get_canonical_component_name(raw_call)
 
                 # Is it an inline component constructor?
-                if fn_name in self.helper.components:
+                if canon_comp and canon_comp in self.helper.components:
                     ctx.inline_counter += 1
                     inline_id = f"_inline_{ctx.inline_counter}"
+                    val_copy = dict(val)
+                    val_copy["call"] = canon_comp
                     compiled_inline = self._compile_ast_node(
-                        inline_id, val, raw_symbols, ctx
+                        inline_id, val_copy, raw_symbols, ctx
                     )
                     if compiled_inline:
                         ctx.extra_components.append(compiled_inline)
-                    return inline_id
+                    return compiled_inline.get("id", inline_id) if compiled_inline else inline_id
+
+                canon_fn = self.helper.get_canonical_function_name(raw_call)
+                fn_name = canon_fn or raw_call
+                fn_args = val["args"]
 
                 # Is it a reserved Template signature?
                 if fn_name == "_template":
@@ -817,6 +1156,27 @@ class ExpressCompiler:
                     ],
                 }
 
+            if (
+                is_action
+                and isinstance(val, dict)
+                and "name" in val
+                and "event" not in val
+                and "functionCall" not in val
+            ):
+                compiled_context = {}
+                raw_ctx = val.get("context", {})
+                if isinstance(raw_ctx, dict):
+                    for ck, cv in raw_ctx.items():
+                        compiled_context[ck] = self._compile_value(
+                            cv, raw_symbols, ctx, is_action=False
+                        )
+                return {
+                    "event": {
+                        "name": str(val["name"]),
+                        "context": compiled_context,
+                    }
+                }
+
             return {
                 k: self._compile_value(v, raw_symbols, ctx, is_action)
                 for k, v in val.items()
@@ -829,5 +1189,17 @@ class ExpressCompiler:
                 comp_item = self._compile_value(item, raw_symbols, ctx, is_action)
                 compiled_list.append(comp_item)
             return compiled_list
+
+        if isinstance(val, str):
+            if val.startswith("${") and val.endswith("}"):
+                inner = val[2:-1].strip()
+                if inner.startswith(("/", "$")) and not any(
+                    ch in inner for ch in " (),'\":\n\t"
+                ):
+                    clean_inner = "/" + inner.lstrip("/").lstrip("$")
+                    return {"path": clean_inner}
+            if val.startswith("$/") and not any(ch in val for ch in " (),'\":\n\t"):
+                return {"path": "/" + val[2:].lstrip("/")}
+            return val
 
         return val

@@ -39,8 +39,8 @@ def _unescape_string(val: str) -> str:
             return "\t"
         if char == "\\":
             return "\\"
-        if char == '"':
-            return '"'
+        if char in ('"', "'"):
+            return char
         return seq
 
     return re.sub(r"\\([\s\S])", repl, val)
@@ -135,10 +135,13 @@ class ExpressAstVisitor(ExpressVisitor):
         return {"type": "pos", "value": self.visit(ctx.expression())}
 
     def visitNamed_arg(self, ctx: ExpressParser.Named_argContext) -> tuple[str, Any]:
-        # named_arg : identifier '=' expression ;
-        k = ctx.identifier().getText()
+        # named_arg : (identifier | string) ('=' | ':') expression ;
+        if ctx.identifier():
+            k = ctx.identifier().getText()
+        else:
+            k = self.visit(ctx.string())
         v = self.visit(ctx.expression())
-        return k, v
+        return str(k), v
 
     def visitCall(self, ctx: ExpressParser.CallContext) -> dict:
         # call : identifier '(' (arg (',' arg)*)? ','? ')' ;
@@ -167,7 +170,7 @@ class ExpressAstVisitor(ExpressVisitor):
             return {"skipped": True}
 
     def visitLiteral(self, ctx: ExpressParser.LiteralContext) -> Any:
-        # literal : string | NUMBER | BOOLEAN | 'null' ;
+        # literal : string | NUMBER | BOOLEAN | 'null' | ELLIPSIS ;
         if ctx.string():
             return self.visit(ctx.string())
         if ctx.NUMBER():
@@ -175,6 +178,8 @@ class ExpressAstVisitor(ExpressVisitor):
             return float(val) if "." in val else int(val)
         if ctx.BOOLEAN():
             return ctx.BOOLEAN().getText() == "true"
+        if getattr(ctx, "ELLIPSIS", None) and ctx.ELLIPSIS():
+            return []
         return None
 
     def visitIdentifier(self, ctx: ExpressParser.IdentifierContext) -> str:
@@ -182,23 +187,35 @@ class ExpressAstVisitor(ExpressVisitor):
         return ctx.IDENTIFIER().getText()
 
     def visitString(self, ctx: ExpressParser.StringContext) -> str:
-        # string : RAW_TRIPLE_STRING | TRIPLE_STRING | RAW_STRING | STANDARD_STRING ;
+        # string : RAW_TRIPLE_STRING | TRIPLE_STRING | RAW_TRIPLE_SINGLE_STRING | TRIPLE_SINGLE_STRING | RAW_STRING | STANDARD_STRING | RAW_SINGLE_STRING | SINGLE_STRING ;
         child = ctx.getChild(0)
         symbol = child.getSymbol()
         token_type = symbol.type
         val = symbol.text
 
-        if token_type == ExpressParser.RAW_TRIPLE_STRING:
-            # val starts with r""" or R""" and ends with """
+        if token_type in (
+            getattr(ExpressParser, "RAW_TRIPLE_STRING", -1),
+            getattr(ExpressParser, "RAW_TRIPLE_SINGLE_STRING", -1),
+        ):
+            # val starts with r""" or r''' and ends with """ or '''
             return val[4:-3]
-        elif token_type == ExpressParser.RAW_STRING:
-            # val starts with r" or R" and ends with "
+        elif token_type in (
+            getattr(ExpressParser, "RAW_STRING", -1),
+            getattr(ExpressParser, "RAW_SINGLE_STRING", -1),
+        ):
+            # val starts with r" or r' and ends with " or '
             return val[2:-1]
-        elif token_type == ExpressParser.TRIPLE_STRING:
-            # val starts with """ and ends with """
+        elif token_type in (
+            getattr(ExpressParser, "TRIPLE_STRING", -1),
+            getattr(ExpressParser, "TRIPLE_SINGLE_STRING", -1),
+        ):
+            # val starts with """ or ''' and ends with """ or '''
             return _unescape_string(val[3:-3])
-        elif token_type == ExpressParser.STANDARD_STRING:
-            # val starts with " and ends with "
+        elif token_type in (
+            getattr(ExpressParser, "STANDARD_STRING", -1),
+            getattr(ExpressParser, "SINGLE_STRING", -1),
+        ):
+            # val starts with " or ' and ends with " or '
             return _unescape_string(val[1:-1])
 
         return val

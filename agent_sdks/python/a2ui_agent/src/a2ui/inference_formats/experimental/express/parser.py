@@ -65,21 +65,137 @@ class ExpressParser(Parser):
 
     def unwrap(self, content: str) -> List[ResponsePart]:
         """Unwraps/tokenizes the response content into raw Express DSL parts."""
+        import re
         from a2ui.parser.lexer import BlockLexer
 
         lexer = BlockLexer(
             open_tag=A2UI_INFERENCE_OPEN_TAG,
             close_tag=A2UI_INFERENCE_CLOSE_TAG,
             string_delimiters={"'", '"'},
-            single_line_comments={"#"},
+            single_line_comments={"#", "//"},
         )
-        return lexer.tokenize(content)
+        parts = lexer.tokenize(content)
+        if any(p.a2ui_raw is not None for p in parts):
+            return parts
+
+        def looks_like_express(text: str) -> bool:
+            if not text or not text.strip():
+                return False
+            t = text.strip()
+            if (t.startswith("[") and t.endswith("]")) or (
+                t.startswith("{") and t.endswith("}")
+            ):
+                try:
+                    import json
+
+                    p = json.loads(t)
+                    if isinstance(p, dict):
+                        p = [p]
+                    if isinstance(p, list) and any(
+                        isinstance(item, dict)
+                        and any(
+                            k in item
+                            for k in (
+                                "createSurface",
+                                "updateComponents",
+                                "updateDataModel",
+                                "deleteSurface",
+                            )
+                        )
+                        for item in p
+                    ):
+                        return True
+                except Exception:
+                    pass
+            express_pattern = re.compile(
+                r"(surface\s*\(|deleteSurface\s*\(|root\s*[=:]|\$[a-zA-Z0-9_/]+\s*[=:]|\b(Column|Row|Card|Text|Button|Tabs|Image|List|Divider|TextField|CheckBox|ChoicePicker|Slider|Modal)\s*\()",
+                re.IGNORECASE,
+            )
+            return bool(express_pattern.search(text))
+
+        # Fallback 1: Extract from markdown code blocks
+        code_block_pattern = re.compile(
+            r"```(?:a2ui|express|python|json)?\s*\n(.*?)\n```", re.DOTALL | re.IGNORECASE
+        )
+        matches = list(code_block_pattern.finditer(content))
+        for m in matches:
+            block = m.group(1).strip()
+            if looks_like_express(block):
+                result_parts = []
+                pre_text = content[:m.start()].strip()
+                if pre_text:
+                    result_parts.append(ResponsePart(text=pre_text, a2ui_raw=None))
+                result_parts.append(ResponsePart(text=None, a2ui_raw=block, is_final=True))
+                post_text = content[m.end():].strip()
+                if post_text:
+                    result_parts.append(ResponsePart(text=post_text, a2ui_raw=None))
+                return result_parts
+
+        # Fallback 2: Any code block
+        any_code_pattern = re.compile(r"```[a-zA-Z-]*\s*\n(.*?)\n```", re.DOTALL)
+        for m in any_code_pattern.finditer(content):
+            block = m.group(1).strip()
+            if looks_like_express(block):
+                result_parts = []
+                pre_text = content[:m.start()].strip()
+                if pre_text:
+                    result_parts.append(ResponsePart(text=pre_text, a2ui_raw=None))
+                result_parts.append(ResponsePart(text=None, a2ui_raw=block, is_final=True))
+                post_text = content[m.end():].strip()
+                if post_text:
+                    result_parts.append(ResponsePart(text=post_text, a2ui_raw=None))
+                return result_parts
+
+        # Fallback 3: Raw response text without markdown backticks
+        if looks_like_express(content):
+            m = re.search(
+                r"(surface\s*\(|root\s*[=:]|\$[a-zA-Z0-9_/]+\s*[=:]|\b(Column|Row|Card|Text|Button|Tabs|Image|List|Divider|TextField|CheckBox|ChoicePicker|Slider|Modal)\s*\()",
+                content,
+                re.IGNORECASE,
+            )
+            if m and m.start() > 0:
+                pre_text = content[:m.start()].strip()
+                raw_code = content[m.start():].strip()
+                result_parts = []
+                if pre_text:
+                    result_parts.append(ResponsePart(text=pre_text, a2ui_raw=None))
+                result_parts.append(ResponsePart(text=None, a2ui_raw=raw_code, is_final=True))
+                return result_parts
+            return [ResponsePart(text=None, a2ui_raw=content.strip(), is_final=True)]
+
+        return parts
 
     def compile(
         self, format_content: str, *, is_final: bool = True
     ) -> List[dict[str, Any]]:
         """Compiles raw Express DSL to structured A2UI messages."""
+        import json
         from a2ui.parser.errors import A2uiCompilationError
+
+        trimmed = format_content.strip()
+        if (trimmed.startswith("[") and trimmed.endswith("]")) or (
+            trimmed.startswith("{") and trimmed.endswith("}")
+        ):
+            try:
+                parsed_json = json.loads(trimmed)
+                if isinstance(parsed_json, dict):
+                    parsed_json = [parsed_json]
+                if isinstance(parsed_json, list) and any(
+                    isinstance(item, dict)
+                    and any(
+                        k in item
+                        for k in (
+                            "createSurface",
+                            "updateComponents",
+                            "updateDataModel",
+                            "deleteSurface",
+                        )
+                    )
+                    for item in parsed_json
+                ):
+                    return parsed_json
+            except json.JSONDecodeError:
+                pass
 
         compiler = ExpressCompiler(self.catalog, version=self.version)
         try:

@@ -59,6 +59,12 @@ class CatalogSchemaHelper:
         self.functions = {
             name: fn.schema for name, fn in self.catalog_model.functions.items()
         }
+        self._lower_components = {
+            name.lower(): name for name in self.components
+        }
+        self._lower_functions = {
+            name.lower(): name for name in self.functions
+        }
         self._load_mappings()
 
     def _load_mappings(self) -> None:
@@ -144,6 +150,80 @@ class CatalogSchemaHelper:
             self.function_properties[name] = list(props.keys())
             self.function_required[name] = reqs
 
+    def get_canonical_component_name(self, name: str) -> Optional[str]:
+        """Returns the canonical component name matching the given name case-insensitively."""
+        if name in self.components:
+            return name
+        return self._lower_components.get(name.lower())
+
+    def get_canonical_function_name(self, name: str) -> Optional[str]:
+        """Returns the canonical function name matching the given name case-insensitively."""
+        if name in self.functions:
+            return name
+        return self._lower_functions.get(name.lower())
+
+    def is_component(self, name: str) -> bool:
+        """Returns True if the name matches a component in the catalog (case-insensitively)."""
+        return self.get_canonical_component_name(name) is not None
+
+    def is_function(self, name: str) -> bool:
+        """Returns True if the name matches a function in the catalog (case-insensitively)."""
+        return self.get_canonical_function_name(name) is not None
+
+    def get_canonical_property_name(
+        self, component_name: str, prop_name: str
+    ) -> Optional[str]:
+        """Resolves property name case-insensitively or via common UI synonym mappings."""
+        canon_comp = self.get_canonical_component_name(component_name) or component_name
+        props = self.get_component_properties(canon_comp)
+        if prop_name in props:
+            return prop_name
+        
+        lower_props = {p.lower(): p for p in props}
+        if prop_name.lower() in lower_props:
+            return lower_props[prop_name.lower()]
+
+        # Common synonyms based on target component properties
+        p_lower = prop_name.lower()
+        if canon_comp == "Button":
+            if p_lower in ("label", "text", "title") and "child" in props:
+                return "child"
+            if p_lower in ("event", "onpress", "onclick", "handler") and "action" in props:
+                return "action"
+        if canon_comp == "Image":
+            if p_lower in ("src", "source", "path") and "url" in props:
+                return "url"
+        if canon_comp == "CheckBox":
+            if p_lower in ("checked", "ischecked") and "value" in props:
+                return "value"
+            if p_lower in ("text", "title") and "label" in props:
+                return "label"
+        if canon_comp == "TextField":
+            if p_lower in ("type", "inputtype") and "variant" in props:
+                return "variant"
+        if "children" in props and p_lower in ("items", "content", "body", "elements"):
+            return "children"
+        if "child" in props and p_lower in ("content", "body", "item", "text", "label"):
+            return "child"
+        if "action" in props and p_lower in ("event", "onclick", "onpress", "handler"):
+            return "action"
+        if canon_comp == "Column":
+            if p_lower in ("horizontalalign", "horizontal_align", "halign", "crossaxisalignment", "crossalign", "alignment") and "align" in props:
+                return "align"
+            if p_lower in ("verticalalign", "vertical_align", "valign", "mainaxisalignment", "mainalign") and "justify" in props:
+                return "justify"
+        if canon_comp == "Row":
+            if p_lower in ("verticalalign", "vertical_align", "valign", "crossaxisalignment", "crossalign", "alignment") and "align" in props:
+                return "align"
+            if p_lower in ("horizontalalign", "horizontal_align", "halign", "mainaxisalignment", "mainalign") and "justify" in props:
+                return "justify"
+        if "align" in props and p_lower in ("alignment", "alignitems", "align_items", "halign", "valign"):
+            return "align"
+        if "justify" in props and p_lower in ("justifycontent", "justify_content"):
+            return "justify"
+
+        return None
+
     def get_component_properties(self, name: str) -> list[str]:
         """Returns the ordered properties of the specified component.
 
@@ -153,7 +233,8 @@ class CatalogSchemaHelper:
         Returns:
             A list of property keys in their schema definition order.
         """
-        return self.component_properties.get(name, [])
+        canon = self.get_canonical_component_name(name) or name
+        return self.component_properties.get(canon, [])
 
     def get_component_required(self, name: str) -> list[str]:
         """Returns the list of required properties for the specified component.
@@ -164,7 +245,8 @@ class CatalogSchemaHelper:
         Returns:
             A list of property keys that are required.
         """
-        return self.component_required.get(name, [])
+        canon = self.get_canonical_component_name(name) or name
+        return self.component_required.get(canon, [])
 
     def is_checkable(self, name: str) -> bool:
         """Returns whether the specified component supports client-side checks.
@@ -175,7 +257,8 @@ class CatalogSchemaHelper:
         Returns:
             Whether the component implements the Checkable interface.
         """
-        return self.component_is_checkable.get(name, False)
+        canon = self.get_canonical_component_name(name) or name
+        return self.component_is_checkable.get(canon, False)
 
     def get_function_properties(self, name: str) -> list[str]:
         """Returns the ordered properties of the specified function's arguments.
@@ -186,7 +269,8 @@ class CatalogSchemaHelper:
         Returns:
             A list of function parameter names in their schema definition order.
         """
-        return self.function_properties.get(name, [])
+        canon = self.get_canonical_function_name(name) or name
+        return self.function_properties.get(canon, [])
 
     def get_function_required(self, name: str) -> list[str]:
         """Returns the list of required argument properties for the function.
@@ -197,7 +281,8 @@ class CatalogSchemaHelper:
         Returns:
             A list of function parameter names that are required.
         """
-        return self.function_required.get(name, [])
+        canon = self.get_canonical_function_name(name) or name
+        return self.function_required.get(canon, [])
 
     def get_function_property_schema(
         self, fn_name: str, prop_name: str
@@ -239,11 +324,14 @@ class CatalogSchemaHelper:
         Returns:
             A list of allowed enum string values, or None if not restricted.
         """
-        return self.component_property_enums.get((component_name, property_name))
+        canon_comp = self.get_canonical_component_name(component_name) or component_name
+        canon_prop = self.get_canonical_property_name(canon_comp, property_name) or property_name
+        return self.component_property_enums.get((canon_comp, canon_prop))
 
     def get_component_description(self, name: str) -> Optional[str]:
         """Retrieves the description of the component from its catalog schema."""
-        schema = self.components.get(name)
+        canon = self.get_canonical_component_name(name) or name
+        schema = self.components.get(canon)
         if not schema:
             return None
         if "description" in schema:
@@ -256,7 +344,8 @@ class CatalogSchemaHelper:
 
     def get_function_description(self, name: str) -> Optional[str]:
         """Retrieves the description of the function from its catalog schema."""
-        schema = self.functions.get(name)
+        canon = self.get_canonical_function_name(name) or name
+        schema = self.functions.get(canon)
         if not schema:
             return None
         return schema.get("description")
@@ -265,7 +354,9 @@ class CatalogSchemaHelper:
         self, component_name: str, property_name: str
     ) -> Optional[dict]:
         """Crawls all sub-schemas of a component to retrieve a property's schema definition."""
-        schema = self.components.get(component_name)
+        canon_comp = self.get_canonical_component_name(component_name) or component_name
+        canon_prop = self.get_canonical_property_name(canon_comp, property_name) or property_name
+        schema = self.components.get(canon_comp)
         if not schema:
             return None
 
@@ -277,9 +368,9 @@ class CatalogSchemaHelper:
             if (
                 isinstance(sub, dict)
                 and "properties" in sub
-                and property_name in sub["properties"]
+                and canon_prop in sub["properties"]
             ):
-                return sub["properties"][property_name]
+                return sub["properties"][canon_prop]
         return None
 
     def get_property_type(

@@ -1,4 +1,4 @@
-# Generated from Express.g4 by ANTLR 4.13.2
+# Generated from specification/inference_formats/express/Express.g4 by ANTLR 4.13.2
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
@@ -10,7 +10,7 @@ else:
 
 def serializedATN():
     return [
-        4,1,24,159,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
+        4,1,29,163,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
         6,2,7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,
         2,14,7,14,2,15,7,15,1,0,5,0,34,8,0,10,0,12,0,37,9,0,1,0,1,0,1,1,
         1,1,3,1,43,8,1,1,2,1,2,3,2,47,8,2,1,2,1,2,1,2,1,3,1,3,1,3,1,3,1,
@@ -20,50 +20,52 @@ def serializedATN():
         6,1,6,1,6,1,6,1,7,1,7,1,8,1,8,1,8,1,8,1,8,5,8,107,8,8,10,8,12,8,
         110,9,8,1,8,3,8,113,8,8,3,8,115,8,8,1,8,3,8,118,8,8,1,9,1,9,1,9,
         1,9,1,9,5,9,125,8,9,10,9,12,9,128,9,9,1,9,3,9,131,8,9,3,9,133,8,
-        9,1,9,1,9,1,10,1,10,3,10,139,8,10,1,11,1,11,1,11,1,11,1,12,1,12,
-        3,12,147,8,12,1,13,1,13,1,13,1,13,3,13,153,8,13,1,14,1,14,1,15,1,
-        15,1,15,0,0,16,0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,0,1,1,
-        0,12,15,170,0,35,1,0,0,0,2,42,1,0,0,0,4,46,1,0,0,0,6,58,1,0,0,0,
-        8,60,1,0,0,0,10,76,1,0,0,0,12,94,1,0,0,0,14,99,1,0,0,0,16,101,1,
-        0,0,0,18,119,1,0,0,0,20,138,1,0,0,0,22,140,1,0,0,0,24,146,1,0,0,
-        0,26,152,1,0,0,0,28,154,1,0,0,0,30,156,1,0,0,0,32,34,3,2,1,0,33,
-        32,1,0,0,0,34,37,1,0,0,0,35,33,1,0,0,0,35,36,1,0,0,0,36,38,1,0,0,
-        0,37,35,1,0,0,0,38,39,5,0,0,1,39,1,1,0,0,0,40,43,3,4,2,0,41,43,3,
-        6,3,0,42,40,1,0,0,0,42,41,1,0,0,0,43,3,1,0,0,0,44,47,3,28,14,0,45,
-        47,3,14,7,0,46,44,1,0,0,0,46,45,1,0,0,0,47,48,1,0,0,0,48,49,5,1,
-        0,0,49,50,3,6,3,0,50,5,1,0,0,0,51,59,3,8,4,0,52,59,3,10,5,0,53,59,
-        3,14,7,0,54,59,3,16,8,0,55,59,3,18,9,0,56,59,3,24,12,0,57,59,3,26,
-        13,0,58,51,1,0,0,0,58,52,1,0,0,0,58,53,1,0,0,0,58,54,1,0,0,0,58,
-        55,1,0,0,0,58,56,1,0,0,0,58,57,1,0,0,0,59,7,1,0,0,0,60,72,5,2,0,
-        0,61,66,3,6,3,0,62,63,5,3,0,0,63,65,3,6,3,0,64,62,1,0,0,0,65,68,
-        1,0,0,0,66,64,1,0,0,0,66,67,1,0,0,0,67,70,1,0,0,0,68,66,1,0,0,0,
-        69,71,5,3,0,0,70,69,1,0,0,0,70,71,1,0,0,0,71,73,1,0,0,0,72,61,1,
-        0,0,0,72,73,1,0,0,0,73,74,1,0,0,0,74,75,5,4,0,0,75,9,1,0,0,0,76,
-        88,5,5,0,0,77,82,3,12,6,0,78,79,5,3,0,0,79,81,3,12,6,0,80,78,1,0,
-        0,0,81,84,1,0,0,0,82,80,1,0,0,0,82,83,1,0,0,0,83,86,1,0,0,0,84,82,
-        1,0,0,0,85,87,5,3,0,0,86,85,1,0,0,0,86,87,1,0,0,0,87,89,1,0,0,0,
-        88,77,1,0,0,0,88,89,1,0,0,0,89,90,1,0,0,0,90,91,5,6,0,0,91,11,1,
-        0,0,0,92,95,3,28,14,0,93,95,3,30,15,0,94,92,1,0,0,0,94,93,1,0,0,
-        0,95,96,1,0,0,0,96,97,5,7,0,0,97,98,3,6,3,0,98,13,1,0,0,0,99,100,
-        5,16,0,0,100,15,1,0,0,0,101,117,5,17,0,0,102,114,5,8,0,0,103,108,
-        3,6,3,0,104,105,5,3,0,0,105,107,3,6,3,0,106,104,1,0,0,0,107,110,
-        1,0,0,0,108,106,1,0,0,0,108,109,1,0,0,0,109,112,1,0,0,0,110,108,
-        1,0,0,0,111,113,5,3,0,0,112,111,1,0,0,0,112,113,1,0,0,0,113,115,
-        1,0,0,0,114,103,1,0,0,0,114,115,1,0,0,0,115,116,1,0,0,0,116,118,
-        5,9,0,0,117,102,1,0,0,0,117,118,1,0,0,0,118,17,1,0,0,0,119,120,3,
-        28,14,0,120,132,5,8,0,0,121,126,3,20,10,0,122,123,5,3,0,0,123,125,
-        3,20,10,0,124,122,1,0,0,0,125,128,1,0,0,0,126,124,1,0,0,0,126,127,
-        1,0,0,0,127,130,1,0,0,0,128,126,1,0,0,0,129,131,5,3,0,0,130,129,
-        1,0,0,0,130,131,1,0,0,0,131,133,1,0,0,0,132,121,1,0,0,0,132,133,
-        1,0,0,0,133,134,1,0,0,0,134,135,5,9,0,0,135,19,1,0,0,0,136,139,3,
-        22,11,0,137,139,3,6,3,0,138,136,1,0,0,0,138,137,1,0,0,0,139,21,1,
-        0,0,0,140,141,3,28,14,0,141,142,5,1,0,0,142,143,3,6,3,0,143,23,1,
-        0,0,0,144,147,5,10,0,0,145,147,3,28,14,0,146,144,1,0,0,0,146,145,
-        1,0,0,0,147,25,1,0,0,0,148,153,3,30,15,0,149,153,5,18,0,0,150,153,
-        5,19,0,0,151,153,5,11,0,0,152,148,1,0,0,0,152,149,1,0,0,0,152,150,
-        1,0,0,0,152,151,1,0,0,0,153,27,1,0,0,0,154,155,5,20,0,0,155,29,1,
-        0,0,0,156,157,7,0,0,0,157,31,1,0,0,0,21,35,42,46,58,66,70,72,82,
-        86,88,94,108,112,114,117,126,130,132,138,146,152
+        9,1,9,1,9,1,10,1,10,3,10,139,8,10,1,11,1,11,3,11,143,8,11,1,11,1,
+        11,1,11,1,12,1,12,3,12,150,8,12,1,13,1,13,1,13,1,13,1,13,3,13,157,
+        8,13,1,14,1,14,1,15,1,15,1,15,0,0,16,0,2,4,6,8,10,12,14,16,18,20,
+        22,24,26,28,30,0,2,1,0,1,2,1,0,12,19,176,0,35,1,0,0,0,2,42,1,0,0,
+        0,4,46,1,0,0,0,6,58,1,0,0,0,8,60,1,0,0,0,10,76,1,0,0,0,12,94,1,0,
+        0,0,14,99,1,0,0,0,16,101,1,0,0,0,18,119,1,0,0,0,20,138,1,0,0,0,22,
+        142,1,0,0,0,24,149,1,0,0,0,26,156,1,0,0,0,28,158,1,0,0,0,30,160,
+        1,0,0,0,32,34,3,2,1,0,33,32,1,0,0,0,34,37,1,0,0,0,35,33,1,0,0,0,
+        35,36,1,0,0,0,36,38,1,0,0,0,37,35,1,0,0,0,38,39,5,0,0,1,39,1,1,0,
+        0,0,40,43,3,4,2,0,41,43,3,6,3,0,42,40,1,0,0,0,42,41,1,0,0,0,43,3,
+        1,0,0,0,44,47,3,28,14,0,45,47,3,14,7,0,46,44,1,0,0,0,46,45,1,0,0,
+        0,47,48,1,0,0,0,48,49,7,0,0,0,49,50,3,6,3,0,50,5,1,0,0,0,51,59,3,
+        8,4,0,52,59,3,10,5,0,53,59,3,14,7,0,54,59,3,16,8,0,55,59,3,18,9,
+        0,56,59,3,24,12,0,57,59,3,26,13,0,58,51,1,0,0,0,58,52,1,0,0,0,58,
+        53,1,0,0,0,58,54,1,0,0,0,58,55,1,0,0,0,58,56,1,0,0,0,58,57,1,0,0,
+        0,59,7,1,0,0,0,60,72,5,3,0,0,61,66,3,6,3,0,62,63,5,4,0,0,63,65,3,
+        6,3,0,64,62,1,0,0,0,65,68,1,0,0,0,66,64,1,0,0,0,66,67,1,0,0,0,67,
+        70,1,0,0,0,68,66,1,0,0,0,69,71,5,4,0,0,70,69,1,0,0,0,70,71,1,0,0,
+        0,71,73,1,0,0,0,72,61,1,0,0,0,72,73,1,0,0,0,73,74,1,0,0,0,74,75,
+        5,5,0,0,75,9,1,0,0,0,76,88,5,6,0,0,77,82,3,12,6,0,78,79,5,4,0,0,
+        79,81,3,12,6,0,80,78,1,0,0,0,81,84,1,0,0,0,82,80,1,0,0,0,82,83,1,
+        0,0,0,83,86,1,0,0,0,84,82,1,0,0,0,85,87,5,4,0,0,86,85,1,0,0,0,86,
+        87,1,0,0,0,87,89,1,0,0,0,88,77,1,0,0,0,88,89,1,0,0,0,89,90,1,0,0,
+        0,90,91,5,7,0,0,91,11,1,0,0,0,92,95,3,28,14,0,93,95,3,30,15,0,94,
+        92,1,0,0,0,94,93,1,0,0,0,95,96,1,0,0,0,96,97,7,0,0,0,97,98,3,6,3,
+        0,98,13,1,0,0,0,99,100,5,21,0,0,100,15,1,0,0,0,101,117,5,22,0,0,
+        102,114,5,8,0,0,103,108,3,6,3,0,104,105,5,4,0,0,105,107,3,6,3,0,
+        106,104,1,0,0,0,107,110,1,0,0,0,108,106,1,0,0,0,108,109,1,0,0,0,
+        109,112,1,0,0,0,110,108,1,0,0,0,111,113,5,4,0,0,112,111,1,0,0,0,
+        112,113,1,0,0,0,113,115,1,0,0,0,114,103,1,0,0,0,114,115,1,0,0,0,
+        115,116,1,0,0,0,116,118,5,9,0,0,117,102,1,0,0,0,117,118,1,0,0,0,
+        118,17,1,0,0,0,119,120,3,28,14,0,120,132,5,8,0,0,121,126,3,20,10,
+        0,122,123,5,4,0,0,123,125,3,20,10,0,124,122,1,0,0,0,125,128,1,0,
+        0,0,126,124,1,0,0,0,126,127,1,0,0,0,127,130,1,0,0,0,128,126,1,0,
+        0,0,129,131,5,4,0,0,130,129,1,0,0,0,130,131,1,0,0,0,131,133,1,0,
+        0,0,132,121,1,0,0,0,132,133,1,0,0,0,133,134,1,0,0,0,134,135,5,9,
+        0,0,135,19,1,0,0,0,136,139,3,22,11,0,137,139,3,6,3,0,138,136,1,0,
+        0,0,138,137,1,0,0,0,139,21,1,0,0,0,140,143,3,28,14,0,141,143,3,30,
+        15,0,142,140,1,0,0,0,142,141,1,0,0,0,143,144,1,0,0,0,144,145,7,0,
+        0,0,145,146,3,6,3,0,146,23,1,0,0,0,147,150,5,10,0,0,148,150,3,28,
+        14,0,149,147,1,0,0,0,149,148,1,0,0,0,150,25,1,0,0,0,151,157,3,30,
+        15,0,152,157,5,23,0,0,153,157,5,24,0,0,154,157,5,11,0,0,155,157,
+        5,20,0,0,156,151,1,0,0,0,156,152,1,0,0,0,156,153,1,0,0,0,156,154,
+        1,0,0,0,156,155,1,0,0,0,157,27,1,0,0,0,158,159,5,25,0,0,159,29,1,
+        0,0,0,160,161,7,1,0,0,161,31,1,0,0,0,22,35,42,46,58,66,70,72,82,
+        86,88,94,108,112,114,117,126,130,132,138,142,149,156
     ]
 
 class ExpressParser ( Parser ):
@@ -76,19 +78,21 @@ class ExpressParser ( Parser ):
 
     sharedContextCache = PredictionContextCache()
 
-    literalNames = [ "<INVALID>", "'='", "'['", "','", "']'", "'{'", "'}'", 
-                     "':'", "'('", "')'", "'_'", "'null'", "<INVALID>", 
+    literalNames = [ "<INVALID>", "'='", "':'", "'['", "','", "']'", "'{'", 
+                     "'}'", "'('", "')'", "'_'", "'null'", "<INVALID>", 
                      "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                     "<INVALID>", "<INVALID>", "<INVALID>", "'...'", "<INVALID>", 
                      "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
                      "<INVALID>", "<INVALID>", "';'" ]
 
     symbolicNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
                       "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
                       "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                      "RAW_TRIPLE_STRING", "TRIPLE_STRING", "RAW_STRING", 
-                      "STANDARD_STRING", "PATH", "CHECK", "NUMBER", "BOOLEAN", 
-                      "IDENTIFIER", "COMMENT", "BLOCK_COMMENT", "SEMICOLON", 
-                      "WS" ]
+                      "RAW_TRIPLE_STRING", "TRIPLE_STRING", "RAW_TRIPLE_SINGLE_STRING", 
+                      "TRIPLE_SINGLE_STRING", "RAW_STRING", "STANDARD_STRING", 
+                      "RAW_SINGLE_STRING", "SINGLE_STRING", "ELLIPSIS", 
+                      "PATH", "CHECK", "NUMBER", "BOOLEAN", "IDENTIFIER", 
+                      "COMMENT", "BLOCK_COMMENT", "SEMICOLON", "WS" ]
 
     RULE_program = 0
     RULE_statement = 1
@@ -125,17 +129,22 @@ class ExpressParser ( Parser ):
     T__10=11
     RAW_TRIPLE_STRING=12
     TRIPLE_STRING=13
-    RAW_STRING=14
-    STANDARD_STRING=15
-    PATH=16
-    CHECK=17
-    NUMBER=18
-    BOOLEAN=19
-    IDENTIFIER=20
-    COMMENT=21
-    BLOCK_COMMENT=22
-    SEMICOLON=23
-    WS=24
+    RAW_TRIPLE_SINGLE_STRING=14
+    TRIPLE_SINGLE_STRING=15
+    RAW_STRING=16
+    STANDARD_STRING=17
+    RAW_SINGLE_STRING=18
+    SINGLE_STRING=19
+    ELLIPSIS=20
+    PATH=21
+    CHECK=22
+    NUMBER=23
+    BOOLEAN=24
+    IDENTIFIER=25
+    COMMENT=26
+    BLOCK_COMMENT=27
+    SEMICOLON=28
+    WS=29
 
     def __init__(self, input:TokenStream, output:TextIO = sys.stdout):
         super().__init__(input, output)
@@ -185,7 +194,7 @@ class ExpressParser ( Parser ):
             self.state = 35
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 2096164) != 0):
+            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 67107912) != 0):
                 self.state = 32
                 self.statement()
                 self.state = 37
@@ -295,16 +304,17 @@ class ExpressParser ( Parser ):
 
         localctx = ExpressParser.AssignmentContext(self, self._ctx, self.state)
         self.enterRule(localctx, 4, self.RULE_assignment)
+        self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 46
             self._errHandler.sync(self)
             token = self._input.LA(1)
-            if token in [20]:
+            if token in [25]:
                 self.state = 44
                 self.identifier()
                 pass
-            elif token in [16]:
+            elif token in [21]:
                 self.state = 45
                 self.path()
                 pass
@@ -312,7 +322,12 @@ class ExpressParser ( Parser ):
                 raise NoViableAltException(self)
 
             self.state = 48
-            self.match(ExpressParser.T__0)
+            _la = self._input.LA(1)
+            if not(_la==1 or _la==2):
+                self._errHandler.recoverInline(self)
+            else:
+                self._errHandler.reportMatch(self)
+                self.consume()
             self.state = 49
             self.expression()
         except RecognitionException as re:
@@ -465,11 +480,11 @@ class ExpressParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 60
-            self.match(ExpressParser.T__1)
+            self.match(ExpressParser.T__2)
             self.state = 72
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 2096164) != 0):
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 67107912) != 0):
                 self.state = 61
                 self.expression()
                 self.state = 66
@@ -478,7 +493,7 @@ class ExpressParser ( Parser ):
                 while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                     if _alt==1:
                         self.state = 62
-                        self.match(ExpressParser.T__2)
+                        self.match(ExpressParser.T__3)
                         self.state = 63
                         self.expression() 
                     self.state = 68
@@ -488,15 +503,15 @@ class ExpressParser ( Parser ):
                 self.state = 70
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if _la==3:
+                if _la==4:
                     self.state = 69
-                    self.match(ExpressParser.T__2)
+                    self.match(ExpressParser.T__3)
 
 
 
 
             self.state = 74
-            self.match(ExpressParser.T__3)
+            self.match(ExpressParser.T__4)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -540,11 +555,11 @@ class ExpressParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 76
-            self.match(ExpressParser.T__4)
+            self.match(ExpressParser.T__5)
             self.state = 88
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 1110016) != 0):
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 34598912) != 0):
                 self.state = 77
                 self.map_entry()
                 self.state = 82
@@ -553,7 +568,7 @@ class ExpressParser ( Parser ):
                 while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                     if _alt==1:
                         self.state = 78
-                        self.match(ExpressParser.T__2)
+                        self.match(ExpressParser.T__3)
                         self.state = 79
                         self.map_entry() 
                     self.state = 84
@@ -563,15 +578,15 @@ class ExpressParser ( Parser ):
                 self.state = 86
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if _la==3:
+                if _la==4:
                     self.state = 85
-                    self.match(ExpressParser.T__2)
+                    self.match(ExpressParser.T__3)
 
 
 
 
             self.state = 90
-            self.match(ExpressParser.T__5)
+            self.match(ExpressParser.T__6)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -616,16 +631,17 @@ class ExpressParser ( Parser ):
 
         localctx = ExpressParser.Map_entryContext(self, self._ctx, self.state)
         self.enterRule(localctx, 12, self.RULE_map_entry)
+        self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 94
             self._errHandler.sync(self)
             token = self._input.LA(1)
-            if token in [20]:
+            if token in [25]:
                 self.state = 92
                 self.identifier()
                 pass
-            elif token in [12, 13, 14, 15]:
+            elif token in [12, 13, 14, 15, 16, 17, 18, 19]:
                 self.state = 93
                 self.string()
                 pass
@@ -633,7 +649,12 @@ class ExpressParser ( Parser ):
                 raise NoViableAltException(self)
 
             self.state = 96
-            self.match(ExpressParser.T__6)
+            _la = self._input.LA(1)
+            if not(_la==1 or _la==2):
+                self._errHandler.recoverInline(self)
+            else:
+                self._errHandler.reportMatch(self)
+                self.consume()
             self.state = 97
             self.expression()
         except RecognitionException as re:
@@ -731,7 +752,7 @@ class ExpressParser ( Parser ):
                 self.state = 114
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if (((_la) & ~0x3f) == 0 and ((1 << _la) & 2096164) != 0):
+                if (((_la) & ~0x3f) == 0 and ((1 << _la) & 67107912) != 0):
                     self.state = 103
                     self.expression()
                     self.state = 108
@@ -740,7 +761,7 @@ class ExpressParser ( Parser ):
                     while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                         if _alt==1:
                             self.state = 104
-                            self.match(ExpressParser.T__2)
+                            self.match(ExpressParser.T__3)
                             self.state = 105
                             self.expression() 
                         self.state = 110
@@ -750,9 +771,9 @@ class ExpressParser ( Parser ):
                     self.state = 112
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
-                    if _la==3:
+                    if _la==4:
                         self.state = 111
-                        self.match(ExpressParser.T__2)
+                        self.match(ExpressParser.T__3)
 
 
 
@@ -814,7 +835,7 @@ class ExpressParser ( Parser ):
             self.state = 132
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 2096164) != 0):
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 67107912) != 0):
                 self.state = 121
                 self.arg()
                 self.state = 126
@@ -823,7 +844,7 @@ class ExpressParser ( Parser ):
                 while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                     if _alt==1:
                         self.state = 122
-                        self.match(ExpressParser.T__2)
+                        self.match(ExpressParser.T__3)
                         self.state = 123
                         self.arg() 
                     self.state = 128
@@ -833,9 +854,9 @@ class ExpressParser ( Parser ):
                 self.state = 130
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if _la==3:
+                if _la==4:
                     self.state = 129
-                    self.match(ExpressParser.T__2)
+                    self.match(ExpressParser.T__3)
 
 
 
@@ -915,12 +936,16 @@ class ExpressParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
+        def expression(self):
+            return self.getTypedRuleContext(ExpressParser.ExpressionContext,0)
+
+
         def identifier(self):
             return self.getTypedRuleContext(ExpressParser.IdentifierContext,0)
 
 
-        def expression(self):
-            return self.getTypedRuleContext(ExpressParser.ExpressionContext,0)
+        def string(self):
+            return self.getTypedRuleContext(ExpressParser.StringContext,0)
 
 
         def getRuleIndex(self):
@@ -939,13 +964,31 @@ class ExpressParser ( Parser ):
 
         localctx = ExpressParser.Named_argContext(self, self._ctx, self.state)
         self.enterRule(localctx, 22, self.RULE_named_arg)
+        self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 140
-            self.identifier()
-            self.state = 141
-            self.match(ExpressParser.T__0)
             self.state = 142
+            self._errHandler.sync(self)
+            token = self._input.LA(1)
+            if token in [25]:
+                self.state = 140
+                self.identifier()
+                pass
+            elif token in [12, 13, 14, 15, 16, 17, 18, 19]:
+                self.state = 141
+                self.string()
+                pass
+            else:
+                raise NoViableAltException(self)
+
+            self.state = 144
+            _la = self._input.LA(1)
+            if not(_la==1 or _la==2):
+                self._errHandler.recoverInline(self)
+            else:
+                self._errHandler.reportMatch(self)
+                self.consume()
+            self.state = 145
             self.expression()
         except RecognitionException as re:
             localctx.exception = re
@@ -984,17 +1027,17 @@ class ExpressParser ( Parser ):
         localctx = ExpressParser.VariableContext(self, self._ctx, self.state)
         self.enterRule(localctx, 24, self.RULE_variable)
         try:
-            self.state = 146
+            self.state = 149
             self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [10]:
                 self.enterOuterAlt(localctx, 1)
-                self.state = 144
+                self.state = 147
                 self.match(ExpressParser.T__9)
                 pass
-            elif token in [20]:
+            elif token in [25]:
                 self.enterOuterAlt(localctx, 2)
-                self.state = 145
+                self.state = 148
                 self.identifier()
                 pass
             else:
@@ -1026,6 +1069,9 @@ class ExpressParser ( Parser ):
         def BOOLEAN(self):
             return self.getToken(ExpressParser.BOOLEAN, 0)
 
+        def ELLIPSIS(self):
+            return self.getToken(ExpressParser.ELLIPSIS, 0)
+
         def getRuleIndex(self):
             return ExpressParser.RULE_literal
 
@@ -1043,28 +1089,33 @@ class ExpressParser ( Parser ):
         localctx = ExpressParser.LiteralContext(self, self._ctx, self.state)
         self.enterRule(localctx, 26, self.RULE_literal)
         try:
-            self.state = 152
+            self.state = 156
             self._errHandler.sync(self)
             token = self._input.LA(1)
-            if token in [12, 13, 14, 15]:
+            if token in [12, 13, 14, 15, 16, 17, 18, 19]:
                 self.enterOuterAlt(localctx, 1)
-                self.state = 148
+                self.state = 151
                 self.string()
                 pass
-            elif token in [18]:
+            elif token in [23]:
                 self.enterOuterAlt(localctx, 2)
-                self.state = 149
+                self.state = 152
                 self.match(ExpressParser.NUMBER)
                 pass
-            elif token in [19]:
+            elif token in [24]:
                 self.enterOuterAlt(localctx, 3)
-                self.state = 150
+                self.state = 153
                 self.match(ExpressParser.BOOLEAN)
                 pass
             elif token in [11]:
                 self.enterOuterAlt(localctx, 4)
-                self.state = 151
+                self.state = 154
                 self.match(ExpressParser.T__10)
+                pass
+            elif token in [20]:
+                self.enterOuterAlt(localctx, 5)
+                self.state = 155
+                self.match(ExpressParser.ELLIPSIS)
                 pass
             else:
                 raise NoViableAltException(self)
@@ -1106,7 +1157,7 @@ class ExpressParser ( Parser ):
         self.enterRule(localctx, 28, self.RULE_identifier)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 154
+            self.state = 158
             self.match(ExpressParser.IDENTIFIER)
         except RecognitionException as re:
             localctx.exception = re
@@ -1130,11 +1181,23 @@ class ExpressParser ( Parser ):
         def TRIPLE_STRING(self):
             return self.getToken(ExpressParser.TRIPLE_STRING, 0)
 
+        def RAW_TRIPLE_SINGLE_STRING(self):
+            return self.getToken(ExpressParser.RAW_TRIPLE_SINGLE_STRING, 0)
+
+        def TRIPLE_SINGLE_STRING(self):
+            return self.getToken(ExpressParser.TRIPLE_SINGLE_STRING, 0)
+
         def RAW_STRING(self):
             return self.getToken(ExpressParser.RAW_STRING, 0)
 
         def STANDARD_STRING(self):
             return self.getToken(ExpressParser.STANDARD_STRING, 0)
+
+        def RAW_SINGLE_STRING(self):
+            return self.getToken(ExpressParser.RAW_SINGLE_STRING, 0)
+
+        def SINGLE_STRING(self):
+            return self.getToken(ExpressParser.SINGLE_STRING, 0)
 
         def getRuleIndex(self):
             return ExpressParser.RULE_string
@@ -1155,9 +1218,9 @@ class ExpressParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 156
+            self.state = 160
             _la = self._input.LA(1)
-            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & 61440) != 0)):
+            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & 1044480) != 0)):
                 self._errHandler.recoverInline(self)
             else:
                 self._errHandler.reportMatch(self)
