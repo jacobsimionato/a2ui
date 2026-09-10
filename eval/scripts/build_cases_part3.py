@@ -1,0 +1,443 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import sys
+sys.path.insert(0, 'eval/scripts')
+from cases_part1 import SYSTEM_PROMPT, CATALOG, DATASET
+
+cases = []
+
+# Case 21
+cases.append({
+    "name": "case_21_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 21: Grounded summarization and proactive web research on pharmaceutical cleanroom continuous automated environmental monitoring and GMP Annex 1 compliance (3 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Summarize the key continuous environmental monitoring guidelines and airborne viable particle limits from our uploaded EU GMP Annex 1 cleanroom manual.",
+        },
+        {
+            "role": "assistant",
+            "content": """Based on the loaded **EU GMP Annex 1 (Manufacture of Sterile Medicinal Products)** manual, here is a summary of continuous monitoring standards [1-4]:
+
+* **Grade A Critical Zone Continuous Monitoring**: Isokinetic sampling probes must sample continuously at 1 CFM (28.3 L/min) during the entire manufacturing process, with alert thresholds set at >= 1 particle/m^3 for >= 5.0 micron particles [1].
+* **Airborne Viable Particle Monitoring**: Active air sampling, settle plates (90 mm diameter, max 4-hour exposure), and contact plates (RODAC) require continuous or rotational placement [2].
+* **Pressure Cascades**: Positive pressure differential of 10 to 15 Pa must be maintained between adjacent cleanroom suites of differing classifications with real-time pressure transducers [3].
+* **Personnel Gowning Qualification**: Operators must pass three consecutive media-fill gowning simulation trials without recovering any colony-forming units (CFUs) [4].""",
+        },
+        {
+            "role": "user",
+            "content": "Does our manual cover automated rapid microbial monitoring (RMM) laser-induced fluorescence methods for real-time bioaerosol detection?",
+        },
+        {
+            "role": "assistant",
+            "content": """The current workspace manual covers traditional agar-based incubation methods (2-5 days incubation) but does not detail recent optical spectroscopy or laser-induced fluorescence (LIF) Rapid Microbial Methods (RMM) for instantaneous viable bioaerosol discrimination [1].
+
+I can perform an external technical search across pharmaceutical engineering repositories for regulatory validation frameworks (USP <1223>, EP 5.1.6) and real-time LIF particle counter benchmark studies. Would you like me to proceed?""",
+        },
+        {
+            "role": "user",
+            "content": "Yes, please search the web for rapid microbial monitoring methods, laser-induced fluorescence bioaerosol counters, and GMP Annex 1 validation guidelines.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of pharmaceutical cleanroom environmental monitoring and GMP Annex 1 compliance containing 7 relevant source items covering rapid microbial methods (RMM), laser-induced fluorescence bioaerosol counters, isokinetic probe placement, and regulatory validation (USP <1223> / EP 5.1.6).
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must synthesize key pharmaceutical cleanroom findings comparing traditional agar incubation with optical LIF methods, pressure cascade tolerances, and regulatory validation protocols, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 22
+cases.append({
+    "name": "case_22_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 22: Curating high-level educational course pathways and professional training certifications in precision viticulture satellite multispectral agronomy (2 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello there! I am an agronomy graduate student looking to specialize in precision viticulture and drone-based multispectral remote sensing.",
+        },
+        {
+            "role": "assistant",
+            "content": """Welcome! Precision viticulture offers exceptional research and career opportunities at the intersection of agronomy, remote sensing, and spatial data analytics.
+
+To tailor the most effective study and certification curriculum, could you share:
+1. **Primary Analytical Focus**: Are you interested in canopy vigor indexing (NDVI/NDRE), thermal infrared evapotranspiration modeling, or yield prediction computer vision?
+2. **Target Operational Platforms**: Will you work primarily with high-resolution multispectral UAV drones, satellite constellations (Sentinel-2 / PlanetScope), or tractor-mounted proximal sensors?
+3. **Accreditation Goals**: Are you seeking university graduate certificates, FAA Part 107 commercial drone pilot licensing, or spatial GIS certification (GISP)?""",
+        },
+        {
+            "role": "user",
+            "content": "RECOMMEND THE BEST PRECISION VITICULTURE CERTIFICATION COURSES AND DRONE REMOTE SENSING AG ACADEMIES COVERING MULTISPECTRAL CANOPY WATER STRESS ANALYSIS.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of precision viticulture and agricultural remote sensing courses containing 9 relevant source items covering university viticulture certificates, UAV multispectral flight academies, canopy water stress indexing (CWSI), and spatial agronomy analytics.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must synthesize curated course offerings, syllabus modules, practical flight training requirements, and analytical toolstacks (QGIS, Pix4Dfields), supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 23
+cases.append({
+    "name": "case_23_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 23: Corporate intelligence, product architecture, and homonymous entity disambiguation for extreme ultraviolet (EUV) photolithography optics manufacturers (3 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Can you provide comprehensive background research and competitive intelligence on Lumina Optics to help me prepare for an engineering consultation?",
+        },
+        {
+            "role": "assistant",
+            "content": """There are two prominent advanced technology firms operating under homonymous 'Lumina' brand identities in optics and industrial manufacturing:
+
+1. **Lumina Optics AG (Oberkochen, Germany)**: Specialized Tier-1 semiconductor optics manufacturer producing high-numerical-aperture (High-NA) extreme ultraviolet (EUV) projection mirrors, multilayer molybdenum-silicon coatings, and atomic-scale wavefront metrology for next-generation lithography scanners.
+2. **Lumina Motion Systems Inc. (Rochester, NY)**: Manufacturer of high-precision motorized stages, voice-coil actuators, and optical breadboards for laboratory microscopy and laser beam routing.
+
+Could you clarify which entity you are consulting with so I can target the appropriate market and technical architecture?""",
+        },
+        {
+            "role": "user",
+            "content": "Confirming Lumina Optics AG for EUV projection mirror optics and semiconductor scanner OEM lithography accounts.",
+        },
+        {
+            "role": "assistant",
+            "content": """Target confirmed: **Lumina Optics AG** (semiconductor lithography optics division).
+
+Key areas for consultative preparation include:
+* **High-NA EUV Projection Optics**: 0.55 NA anamorphic projection systems providing 8 nm half-pitch resolution for 2 nm and sub-2 nm node logic fabrication.
+* **Multilayer Mo/Si Bragg Reflector Coatings**: Alternating layers of molybdenum and silicon optimized for 13.5 nm wavelength radiation at ~70% theoretical reflectivity limit.
+* **Sub-Picometer Wavefront Error Metrology**: Extreme surface figure accuracy measured using point-diffraction interferometry and grazing-incidence X-ray reflectometry.
+
+Shall I conduct an external intelligence search across semiconductor industry trade journals and patent disclosures to profile their supply chain partnerships and competitive moat against Nikon and Canon?""",
+        },
+        {
+            "role": "user",
+            "content": "Yes, please retrieve authoritative technical and commercial sources on Lumina Optics AG High-NA EUV mirror coatings, supplier ties to ASML, and lithography patents.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of extreme ultraviolet (EUV) photolithography mirror optics and supplier intelligence containing 5 relevant source items covering High-NA 0.55 NA anamorphic projection, multilayer Mo/Si coating physics, ASML supplier relationships, and competitive patent filings.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must synthesize key semiconductor equipment findings detailing technical specifications (interferometry, reflectivity limits, wavefront error) and corporate positioning, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 24
+cases.append({
+    "name": "case_24_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 24: Writing a rigorous, evidence-based longform research synthesis connecting computational acoustic phonetic alignment algorithms to low-resource endangered languages (3 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Can you write an in-depth evidence-based research essay on computational acoustic phonetic forced alignment for low-resource indigenous Amazonian languages, specifically analyzing how zero-resource phonetic embeddings overcome the lack of curated pronunciation lexicons?",
+        },
+        {
+            "role": "assistant",
+            "content": """Computational phonetic alignment in low-resource indigenous languages presents profound challenges due to:
+* **Absence of Grapheme-to-Phoneme (G2P) Lexicons**: Standard tools (e.g. Montreal Forced Aligner) rely on extensive dictionary lookups unavailable for unwritten or emerging-orthography languages [1].
+* **Complex Acoustic Phonology**: Contrastive nasalization, glottalized stops, and tonal contours that violate Indo-European phonetic priors [2].
+* **Data Scarcity**: Training corpora frequently limited to fewer than 5-10 hours of noisy field recordings.
+
+Recent breakthroughs leverage self-supervised speech representations (e.g. wav2vec 2.0, w2v-BERT) and unsupervised hidden Markov models to induce acoustic-phonetic boundaries without manual alignments.
+
+Would you like to ground the essay with specific empirical studies from the Zero Resource Speech Challenge and indigenous language archival initiatives?""",
+        },
+        {
+            "role": "user",
+            "content": "Yes, let's ground it in empirical benchmarks. Can we search for recent research comparing unsupervised multilingual acoustic models (such as MMS and XLS-R) on Amazonian language vowel formant alignment?",
+        },
+        {
+            "role": "assistant",
+            "content": """Our workspace contains foundational phonetic textbooks but lacks recent 2023-2025 conference proceedings (Interspeech, ACL) evaluating Meta's Massively Multilingual Speech (MMS) and wav2vec-XLS-R architectures on Tupian and Arawakan phonetic field recordings [1].
+
+I can execute an external scholarly literature search in computational linguistics repositories for empirical benchmark datasets, phone error rates (PER), and boundary alignment tolerance metrics. Shall I initiate this search?""",
+        },
+        {
+            "role": "user",
+            "content": "Proceed with the literature search and longform essay, ensuring you tie self-supervised acoustic representations directly to field linguistics vowel formant tracking.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of computational acoustic phonetic alignment for low-resource languages containing 4 relevant source items covering self-supervised speech representations (MMS, XLS-R), zero-resource forced alignment algorithms, and indigenous language field phonetics.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver an evidence-based research synthesis addressing zero-resource alignment architectures, phone boundary error tolerances, and acoustic formant tracking challenges in indigenous languages, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 25
+cases.append({
+    "name": "case_25_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 25: Conducting a strategic macro-environmental PESTLE analysis for municipal urban forestry and microclimate urban heat island (UHI) mitigation (2 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Can you perform a PESTLE strategic analysis for a municipal urban forestry initiative aiming to expand tree canopy cover by 30% to mitigate urban heat island (UHI) effects in a post-industrial city?",
+        },
+        {
+            "role": "assistant",
+            "content": """Conducting a PESTLE macro-environmental analysis provides an essential strategic foundation for large-scale municipal urban canopy expansion [1-6]:
+
+* **Political**: Federal climate resilience grants, bipartisan support for stormwater management, and environmental justice equity targeting in historically redlined neighborhoods [1].
+* **Economic**: Upfront nursery sapling procurement and 3-year establishment watering costs versus avoided stormwater infrastructure expenditures and reduced residential cooling energy demand [2].
+* **Social**: Community tree-stewardship volunteer networks, resident concerns regarding sidewalk root upheaval and branch liabilities, and equitable canopy distribution [3].
+* **Technological**: Satellite thermal infrared (Landsat/ECOSTRESS) surface temperature mapping, LiDAR canopy volume measurement, and smart IoT soil moisture irrigation sensors [4].
+* **Legal**: Municipal right-of-way planting ordinances, utility easement clearance statutory mandates, and contractor warranty compliance [5].
+* **Environmental**: Species selection resilience under projected 2050 climatic shifts, invasive pest resistance (e.g. Emerald Ash Borer), and biogenic volatile organic compound (BVOC) emissions [6].""",
+        },
+        {
+            "role": "user",
+            "content": "Please proceed with external research across urban forestry journals, municipal climate adaptation plans, and satellite microclimate studies to build our comprehensive strategy dossier.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of municipal urban forestry and urban heat island mitigation containing 8 relevant source items covering satellite thermal microclimate studies, PESTLE strategic frameworks, municipal canopy ordinances, and climate-resilient tree species selection.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver a structured PESTLE macro-environmental analysis integrating satellite thermal data, stormwater economic co-benefits, and municipal regulatory guidelines, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 26
+cases.append({
+    "name": "case_26_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 26: Formulating B2B value proposition frameworks and sales enablement methodologies for commercializing deep geothermal district heating infrastructure (3 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Could you search for frameworks to help structure our B2B commercialization and utility sales enablement strategy for closed-loop deep geothermal district heating networks?",
+        },
+        {
+            "role": "assistant",
+            "content": """Commercializing deep closed-loop geothermal heating to municipal utilities and district energy operators requires bridging high initial capital expenditure with long-term levelized cost advantages [1-3]:
+
+* **B2B Value Proposition Framework**: Positioning geothermal as zero-carbon baseload heat that eliminates commodity fuel price volatility and exposure to carbon emissions trading penalties [1].
+* **Risk Allocation & Contractual Structuring**: Implementing 25-year Heat Purchase Agreements (HPAs) with take-or-pay capacity charges and index-linked energy output tariffs [2].
+* **Sales Enablement Matrix**: Providing utility chief engineers with validated subsurface heat exchanger simulation data and coefficient of performance (COP) metrics across multi-decade operational horizons [3].
+
+Would you like to explore specific commercial case studies, such as the Munich district heating geothermal expansion or North American advanced geothermal deployments?""",
+        },
+        {
+            "role": "user",
+            "content": "Yes, we need concrete financial models comparing levelized cost of heat (LCOH) against biomass and industrial heat pumps, as well as municipal public-private partnership (PPP) concession structures.",
+        },
+        {
+            "role": "assistant",
+            "content": """Our current workspace documents discuss general thermodynamics but lack verified financial project finance models for geothermal Levelized Cost of Heat (LCOH, $/MWh_th) and public-private concession term sheets [1].
+
+I can conduct an external search across district energy finance and geothermal engineering repositories for recent financial sensitivity models, drilling cost curve amortizations, and municipal concession contracts. Shall I proceed?""",
+        },
+        {
+            "role": "user",
+            "content": "Yes, please retrieve authoritative technical and commercial sources on deep geothermal district heating commercialization, LCOH sensitivity models, and municipal off-take contracts.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of deep geothermal district heating commercialization containing 4 relevant source items covering Levelized Cost of Heat (LCOH) financial models, Heat Purchase Agreement (HPA) concession term sheets, subsurface closed-loop engineering, and municipal utility off-take agreements.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver a structured B2B sales enablement framework detailing value propositions, LCOH comparisons, financial risk allocation mechanisms, and utility procurement workflows, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 27
+cases.append({
+    "name": "case_27_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 27: Identifying market whitespaces and regulatory grid code compliance for cross-border subsea high-voltage direct current (HVDC) power interconnectors (3 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "I want to explore high-value consulting market whitespaces in cross-border energy infrastructure, specifically focusing on subsea High-Voltage Direct Current (HVDC) interconnectors in the North Sea and Baltic regions.",
+        },
+        {
+            "role": "assistant",
+            "content": """Cross-border subsea HVDC interconnectors represent a massive strategic infrastructure whitespace driven by offshore wind integration and cross-zonal electricity market coupling [1-4]:
+
+* **Merchant vs Regulated Transmission Concessions**: Merchant interconnectors authorized under EU Electricity Regulation exemptions face complex cap-and-floor revenue regimes (e.g. UK Ofgem model) [1].
+* **Multi-Terminal VSC-HVDC Grid Meshing**: Transitioning from point-to-point subsea links to offshore meshed HVDC grids requires standardization of DC circuit breakers and interoperable multi-vendor converters [2].
+* **Ancillary Services & Black-Start Arbitrage**: Subsea links providing synthetic inertia, fast frequency response (FFR), and black-start capabilities earn lucrative non-arbitrage capacity revenues [3].
+* **Environmental & Seabed Permitting**: Navigating sovereign maritime spatial planning, rocky seabed trenching, and cable thermal heating impacts on benthic habitats [4].
+
+Shall we narrow this down to market whitespace modeling or regulatory grid code compliance frameworks?""",
+        },
+        {
+            "role": "user",
+            "content": "Let's investigate merchant interconnector regulatory compliance under ENTSO-E grid codes and revenue arbitrage modeling across divergent bidding zones.",
+        },
+        {
+            "role": "assistant",
+            "content": """Our workspace contains broad regional electricity statistics but lacks the detailed ENTSO-E High Voltage Direct Current Network Code (Commission Regulation EU 2016/1447) statutory specifications and quantitative price-spread backtests between bidding zones [1].
+
+I can execute an external search across transmission system operator (TSO) publications, regulatory agency filings (ACER, Ofgem), and power market economics literature. Shall I initiate the research?""",
+        },
+        {
+            "role": "user",
+            "content": "Please research the subsea HVDC interconnector regulatory arbitrage and merchant transmission market. We want to identify high-value consulting advisory offerings.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of cross-border subsea HVDC power interconnectors containing 6 relevant source items covering ENTSO-E grid code compliance, cap-and-floor regulatory mechanisms, multi-terminal VSC converter technology, and bidding zone arbitrage models.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver a structured management consulting analysis outlining high-value advisory whitespaces, regulatory compliance requirements, revenue stack models, and seabed permitting challenges, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 28
+cases.append({
+    "name": "case_28_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 28: Developing a detailed multi-act narrative script outline for a biographical documentary on early oceanic navigation astrolabes and marine sextant mechanical development (1 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": """I am preparing a long-form audio documentary script about the evolution of oceanic navigational instruments from medieval mariner's astrolabes to the 18th-century marine sextant and John Harrison's marine chronometer H4.
+Please outline a multi-act narrative treatment:
+* Act I: The Mariner's Astrolabe and the Perils of Dead Reckoning in the Age of Discovery.
+* Act II: Isaac Newton, John Hadley, and the Breakthrough of the Double-Reflecting Octant.
+* Act III: The Longitude Prize and the Battle Between Celestial Lunar Distances (Nevill Maskelyne) and Mechanical Clockwork (John Harrison).
+* Act IV: Standardization of the Brass Marine Sextant and the Cartographic Revolution.
+Incorporate primary historical logbook quotes, mechanical vernier scale explanations, and compile an A2UI SourceImportCard indexing authoritative archival and maritime museum sources.""",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of early oceanic navigation instruments and the longitude problem containing 3 relevant source items covering National Maritime Museum archives, John Harrison's chronometer trials, and the technical development of the marine sextant.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver a compelling, multi-act biographical documentary narrative script outline detailing mechanical optical innovations (double-reflection principle, vernier dividing engines), historical rivalries, and primary archival references, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 29
+cases.append({
+    "name": "case_29_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 29: Exploring scientific mechanisms of superplastic deformation and grain boundary sliding in high-temperature titanium-aluminide aerospace alloys (3 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": [
+        {
+            "role": "user",
+            "content": "Discuss the micromechanical mechanisms of superplastic deformation in intermetallic titanium-aluminide (gamma-TiAl) alloys during high-temperature isothermal forging.",
+        },
+        {
+            "role": "assistant",
+            "content": """Superplastic deformation in gamma-TiAl alloys (typically occurring at temperatures between 950 and 1,150 deg C and strain rates of 10^-4 to 10^-2 s^-1) is governed by three cooperative micromechanical processes [1-3]:
+
+1. **Grain Boundary Sliding (GBS)**: The dominant deformation mode, where equiaxed fine grains (average grain size d < 5 micrometers) slide past one another under shear stress along high-angle grain boundaries [1].
+2. **Dislocation Accommodation and Diffusion Relaxation**: Stress concentrations at triple junctions caused by GBS are accommodated by localized dislocation climb-assisted glide or Coble grain boundary diffusion, preventing premature intergranular cavitation [2].
+3. **Dynamic Recrystallization (DRX)**: Continuous dynamic recrystallization refines coarse lamellar colonies into micro-duplex gamma + alpha-2 equiaxed microstructures, maintaining high strain-rate sensitivity [3].""",
+        },
+        {
+            "role": "user",
+            "content": "What is the critical strain-rate sensitivity exponent m required to prevent catastrophic tensile necking, and how do beta-phase stabilizers like niobium and molybdenum suppress cavitation?",
+        },
+        {
+            "role": "assistant",
+            "content": """To resist necking and achieve superplastic elongations exceeding 300%, the strain-rate sensitivity exponent m = (d ln sigma) / (d ln dot_epsilon) must generally exceed **0.4 to 0.5** [1].
+
+Beta-phase stabilizers (e.g. 4-8 at.% Nb, 1-2 at.% Mo) introduce a disordered BCC beta/B2 phase at forging temperatures:
+* **Enhanced Diffusivity**: The BCC beta phase has a diffusion coefficient approximately two orders of magnitude higher than the ordered HCP alpha-2 or tetragonal gamma phases, providing rapid stress relief at grain boundary triple junctions [2].
+* **Cavitation Suppression**: By facilitating grain boundary mobility, the ductile beta phase accommodates intergranular sliding and closes embryonic micro-voids before they coalesce into macroscopic cracks [3].
+
+Our current workspace documents do not contain recent in-situ synchrotron X-ray microtomography studies on cavity nucleation in beta-solidifying TiAl alloys. Would you like me to search external metallurgical literature?""",
+        },
+        {
+            "role": "user",
+            "content": "Yes, please search the metallurgical literature for synchrotron X-ray microtomography studies on superplastic cavity nucleation in gamma-TiAl alloys and provide the research report.",
+        },
+    ],
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of superplastic deformation in titanium-aluminide alloys containing 5 relevant source items covering grain boundary sliding micromechanics, strain-rate sensitivity exponents, in-situ synchrotron X-ray microtomography of cavitation, and beta-phase stabilizer thermodynamics.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver a structured metallurgical synthesis addressing grain boundary sliding, Coble creep accommodation, beta-phase ductility mechanisms, and quantitative constitutive flow equations, supported by numbered citations ([1], [2], etc.).""",
+})
+
+# Case 30 (35 messages: 17 back-and-forth turns + 1 final prompt)
+c30_msgs = []
+topics_c30 = [
+    ("Sorry, I uploaded the wrong project document! I am an undergraduate student starting my senior thesis on highway wildlife crossing overpasses and ecological connectivity.", "No worries! Let's clear the slate. Designing wildlife crossing overpasses is a fantastic, vital field combining landscape ecology, civil structural engineering, and spatial GIS analysis [1]. What is the geographic region or target wildlife species for your thesis?"),
+    ("I am focusing on the Canadian Rocky Mountains Highway 1 corridor through Banff National Park, specifically focusing on large carnivores (grizzly bears, wolves) and ungulates (elk, bighorn sheep).", "The Banff wildlife crossing structures along the Trans-Canada Highway are the world's premier benchmark [1-2]. Long-term research by Dr. Anthony Clevenger provides over 25 years of continuous empirical monitoring data across 44 dedicated wildlife underpasses and 6 major overpasses [1]."),
+    ("What are the key structural dimensions and parabolic widths required for an effective wildlife overpass?", "Effective overpasses typically feature an hourglass or parabolic shape: wider at the approaches (50 to 70 meters) and tapering toward the center span (minimum 40 to 50 meters wide over the highway lanes) [2]. This funnel geometry encourages hesitant carnivores to approach and cross without visual confinement."),
+    ("How does soil depth and vegetation layering affect structural dead load on the bridge girders?", "Soil depth is the primary engineering driver of dead load [3]. Typically, 1.0 to 1.5 meters of engineered lightweight soil is placed in central depressions for tree root balls, tapering to 0.3 to 0.5 meters of topsoil at the perimeter for native grasses and shrubs, resulting in dead loads of 15 to 25 kN/m^2 [3]."),
+    ("What structural girder types are best suited for spanning four lanes of traffic without center piers?", "Prestressed concrete box girders or precast concrete arch culvert systems are commonly used [4]. Arched soil-steel structures or three-hinge precast concrete arches offer excellent aesthetic integration with surrounding terrain and distribute heavy soil overburden efficiently into abutment footings [4]."),
+    ("How do we shield animals on the bridge from highway traffic headlights and acoustic noise?", "Sound and light attenuation berms are mandatory [5]. Earth berms measuring 1.5 to 2.0 meters in height constructed along the outer edges of the overpass deck, topped with dense wooden sound fences or vegetated brush piles, reduce traffic decibel levels by 10-15 dB and block direct visual sightlines to vehicle headlights [5]."),
+    ("What are the critical fencing height and bury depth standards to prevent animals from breaching the highway right-of-way?", "Standard high-tensile woven wire fencing must be at least 2.4 meters (8 feet) high [6]. The lower 0.3 meters must be buried or folded outward in an apron and anchored with rock riprap to prevent burrowing species (wolves, coyotes) from digging underneath [6]."),
+    ("How do wildlife jump-outs function when an animal gets trapped inside the highway fencing?", "Jump-outs (or escape ramps) are one-way dirt ramps constructed inside the fence line, sloping up to an elevated retaining wall 1.5 to 1.8 meters high facing outward [7]. Trapped animals can walk up the gentle earthen incline and jump down to safety, while animals outside cannot leap back into the highway [7]."),
+    ("Are there species-specific crossing preferences between overpasses and underpasses?", "Yes, distinct behavioral divergence exists [8]. Grizzly bears, wolves, moose, and deer strongly favor open, vegetated overpasses with high sky visibility, whereas black bears and cougars frequently utilize narrower, sheltered concrete underpasses [8]."),
+    ("How is the cost-distance surface calculated in ArcGIS for least-cost corridor path modeling?", "A cost-distance raster assigns resistance values (from 1 to 100) based on slope, vegetation canopy cover, distance from paved roads, and human building density [9]. The Least Cost Path algorithm then traces the optimal minimum-cumulative-resistance corridor between protected core habitats [9]."),
+    ("What metrics should I use to quantify genetic flow between isolated populations across the highway?", "Key population genetic metrics include effective population size (Ne), allelic richness (Ar), and pairwise fixation index (Fst) derived from non-invasive hair-snag DNA sampling [10]. Successful crossings show significant reductions in genetic differentiation Fst across the highway barrier [10]."),
+    ("How should I structure the methodology chapter for my senior undergraduate thesis?", "Structure the methodology across four distinct phases [11]: (1) Spatial Multi-Criteria GIS Corridor Selection; (2) Structural Overpass Engineering and Soil Load Sizing; (3) Remote Camera Trap Monitoring Sampling Protocols; (4) Before-After-Control-Impact (BACI) Statistical Analysis [11]."),
+    ("What statistical models are best for analyzing multi-year camera trap photo detection rates?", "Generalized Linear Mixed Models (GLMMs) with a Poisson or negative binomial error distribution and log-link function are gold standards [12]. Structure individual crossing structures as random effects and time-since-construction as a continuous fixed effect to account for habituation learning curves [12]."),
+    ("How long is the habituation period before wary carnivores regularly use newly built overpasses?", "Empirical data from Banff reveals a species-specific learning curve [13]: elk and deer use structures within the first 6-12 months, whereas grizzly bears and wolf packs require a 3 to 5 year habituation lag before establishing maternal crossing traditions [13]."),
+    ("What are the estimated construction costs per overpass compared to standard vehicular overpasses?", "A dedicated vegetated wildlife overpass typically costs between $6M and $10M depending on span length and soil overburden, roughly 20-30% higher than a conventional vehicular highway overpass due to specialized soil dead load capacity and parabolic wingwalls [14]."),
+    ("How can I frame the economic cost-benefit analysis based on avoided wildlife-vehicle collisions?", "Frame the ROI using average insurance claim costs per collision [15]: with elk collisions averaging $12,000 and moose collisions averaging $35,000 in vehicle damage and medical costs, an overpass preventing 50-70 large animal collisions annually recoups its capital cost within 8-12 years [15]."),
+    ("Can we search for recent post-2022 empirical camera-trap monitoring papers from Colorado I-70 and Banff to include in my literature review?", "The current workspace contains foundational studies up to 2020 but lacks recent 2022-2025 published camera trap monitoring reports and genetic connectivity audits from Colorado's I-70 Vail Pass and Banff expansions [1]. Would you like me to search external academic repositories for these recent empirical papers?"),
+]
+
+for q, a in topics_c30:
+    c30_msgs.append({"role": "user", "content": q})
+    c30_msgs.append({"role": "assistant", "content": a})
+
+c30_msgs.append({
+    "role": "user",
+    "content": "Yes, please search the web for recent wildlife overpass camera trap monitoring data, genetic connectivity studies, and engineering guidelines to include in my thesis literature review."
+})
+
+cases.append({
+    "name": "case_30_researcher",
+    "dataset": DATASET,
+    "description": "Evaluation case 30: Guiding an undergraduate graduation thesis research workflow on wildlife ecological corridor overpass design and highway landscape permeability (18 turns context)",
+    "catalog": CATALOG,
+    "system_prompt": SYSTEM_PROMPT,
+    "messages": c30_msgs,
+    "target": """A valid A2UI payload rendering a SourceImportCard component alongside a comprehensive domain research synthesis:
+1. **SourceImportCard Structure**: The UI must render a SourceImportCard component with a descriptive summary of wildlife crossing overpasses and ecological connectivity containing 5 relevant source items covering long-term camera trap monitoring, parabolic overpass engineering standards, genetic connectivity Fst metrics, and wildlife-vehicle collision cost-benefit models.
+2. **Source Item Metadata**: Each source item in the card must include a clear, descriptive title, a valid URL string, and appropriate source metadata (such as sourceType, sourceName, or summary).
+3. **Domain Synthesis Quality**: The accompanying assistant response must deliver a structured academic thesis research review covering spatial GIS least-cost modeling, civil engineering soil loads, habituation lags, and empirical monitoring datasets, supported by numbered citations ([1], [2], etc.).""",
+})
+
+with open('eval/scripts/cases_part3.py', 'w') as f:
+    f.write(f'''# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Synthetic evaluation cases 21 to 30."""
+
+from cases_part1 import SYSTEM_PROMPT, CATALOG, DATASET
+
+CASES_PART_3 = {repr(cases)}
+''')
+
+print(f"Successfully generated cases_part3.py with {len(cases)} cases")
