@@ -46,6 +46,7 @@ members = [
   "samples/community/mcp/mcp-apps-calculator",
   "catalogs/mcp",
   "tools/build_catalog",
+  "samples/vitalcraft_health_gemma/server",
 ]
 
 [dependency-groups]

@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://a2ui.org/catalogs/vitalcraft_health.json",
+  "title": "VitalCraft Health and Exercise Catalog",
+  "description": "Component catalog for the VitalCraft on-device health, blood pressure, and workout planning assistant.",
+  "catalogId": "https://a2ui.org/catalogs/vitalcraft_health.json",
+  "components": {
+    "BloodPressureCard": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "BloodPressureCard" },
+            "systolic": {
+              "type": "integer",
+              "description": "Systolic blood pressure (mmHg), e.g. 128",
+              "positionalIndex": 0
+            },
+            "diastolic": {
+              "type": "integer",
+              "description": "Diastolic blood pressure (mmHg), e.g. 84",
+              "positionalIndex": 1
+            },
+            "pulse": {
+              "type": "integer",
+              "description": "Heart rate in beats per minute, e.g. 72"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["Normal", "Elevated", "Stage 1 Hypertension", "Stage 2 Hypertension"],
+              "description": "Clinical classification category"
+            },
+            "trend": {
+              "type": "string",
+              "description": "Relative trend description, e.g. +4 mmHg vs last week"
+            },
+            "recordedAt": {
+              "type": "string",
+              "description": "Reading timestamp, e.g. Today, 8:15 AM"
+            }
+          },
+          "required": ["component", "systolic", "diastolic", "status"]
+        }
+      ]
+    },
+    "ExerciseLogCard": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "ExerciseLogCard" },
+            "activity": {
+              "type": "string",
+              "description": "Activity name, e.g. Brisk Walking or Zone 2 Cycling",
+              "positionalIndex": 0
+            },
+            "durationMinutes": {
+              "type": "integer",
+              "description": "Session duration in minutes, e.g. 30",
+              "positionalIndex": 1
+            },
+            "avgHeartRate": {
+              "type": "integer",
+              "description": "Average heart rate during workout (bpm), e.g. 118"
+            },
+            "calories": {
+              "type": "integer",
+              "description": "Estimated calories burned, e.g. 165"
+            },
+            "intensity": {
+              "type": "string",
+              "enum": ["Light", "Moderate", "High"],
+              "description": "Perceived intensity"
+            },
+            "date": {
+              "type": "string",
+              "description": "Date or time of exercise, e.g. Yesterday, 5:30 PM"
+            },
+            "notes": {
+              "type": "string",
+              "description": "Optional workout observation or note"
+            }
+          },
+          "required": ["component", "activity", "durationMinutes"]
+        }
+      ]
+    },
+    "HealthPlanBuilder": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "HealthPlanBuilder" },
+            "planTitle": {
+              "type": "string",
+              "description": "Name of the health or exercise plan",
+              "positionalIndex": 0
+            },
+            "targetMetric": {
+              "type": "string",
+              "description": "Primary clinical target, e.g. Goal: Systolic < 125 mmHg"
+            },
+            "durationWeeks": {
+              "type": "integer",
+              "description": "Plan duration in weeks, e.g. 2"
+            },
+            "milestones": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Key habits or milestones to achieve"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["proposed", "active", "completed"],
+              "description": "Plan status"
+            }
+          },
+          "required": ["component", "planTitle", "targetMetric", "milestones"]
+        }
+      ]
+    },
+    "VitalsComparisonTable": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "VitalsComparisonTable" },
+            "headers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Table column header titles"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "description": "Matrix of table row values"
+            },
+            "highlightMetric": {
+              "type": "string",
+              "description": "Name of row or column to visually highlight"
+            }
+          },
+          "required": ["component", "headers", "rows"]
+        }
+      ]
+    },
+    "VitalsTrendChart": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "VitalsTrendChart" },
+            "title": {
+              "type": "string",
+              "description": "Title of the chart, e.g. 7-Day Blood Pressure Trend",
+              "positionalIndex": 0
+            },
+            "metric": {
+              "type": "string",
+              "enum": ["blood_pressure", "exercise_minutes", "heart_rate"],
+              "description": "Metric being plotted"
+            },
+            "labels": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "X-axis labels, e.g. ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+            },
+            "systolicValues": {
+              "type": "array",
+              "items": { "type": "number" },
+              "description": "Systolic values across time points"
+            },
+            "diastolicValues": {
+              "type": "array",
+              "items": { "type": "number" },
+              "description": "Diastolic values across time points"
+            },
+            "exerciseMinutes": {
+              "type": "array",
+              "items": { "type": "number" },
+              "description": "Workout minutes per day"
+            },
+            "targetThreshold": {
+              "type": "number",
+              "description": "Guideline target line, e.g. 120"
+            }
+          },
+          "required": ["component", "title", "metric", "labels"]
+        }
+      ]
+    },
+    "HabitTracker": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "HabitTracker" },
+            "title": {
+              "type": "string",
+              "description": "Habit group title, e.g. Daily Heart-Health Habits",
+              "positionalIndex": 0
+            },
+            "habits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "streakDays": { "type": "integer" },
+                  "completedToday": { "type": "boolean" },
+                  "category": { "type": "string" }
+                },
+                "required": ["id", "name", "completedToday"]
+              }
+            }
+          },
+          "required": ["component", "title", "habits"]
+        }
+      ]
+    },
+    "MultipleChoiceQuestion": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "MultipleChoiceQuestion" },
+            "question": {
+              "type": "string",
+              "description": "The prompt question to ask the user",
+              "positionalIndex": 0
+            },
+            "options": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Selectable choices"
+            },
+            "selected": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Currently selected option(s)"
+            },
+            "multiSelect": {
+              "type": "boolean",
+              "description": "Whether multiple options can be chosen"
+            }
+          },
+          "required": ["component", "question", "options"]
+        }
+      ]
+    },
+    "IntensityPicker": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/CatalogComponentCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "component": { "const": "IntensityPicker" },
+            "label": {
+              "type": "string",
+              "description": "Label for the slider/stepper, e.g. Target Exertion (RPE 1-10)",
+              "positionalIndex": 0
+            },
+            "selected": {
+              "type": "integer",
+              "description": "Selected intensity level (1 to 10)",
+              "positionalIndex": 1
+            },
+            "min": { "type": "integer", "default": 1 },
+            "max": { "type": "integer", "default": 10 }
+          },
+          "required": ["component", "label", "selected"]
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "CatalogComponentCommon": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Component unique identifier"
+        },
+        "component": {
+          "type": "string",
+          "description": "Component name"
+        }
+      }
+    }
+  }
+}

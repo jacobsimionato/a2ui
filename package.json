@@ -14,6 +14,7 @@
     "samples/client/lit",
     "samples/client/lit/*",
     "samples/client/react/*",
+    "samples/vitalcraft_health_gemma/client",
     "samples/personalized_learning",
     "specification/*/eval",
     "specification/*/test",
