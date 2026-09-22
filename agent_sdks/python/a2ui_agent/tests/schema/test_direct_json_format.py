@@ -155,3 +155,32 @@ def test_direct_json_parser_no_supported_catalogs():
     direct_json_format._supported_catalogs = []
     with pytest.raises(A2uiCatalogError, match="No supported catalogs configured"):
         _ = direct_json_format.parser
+
+
+def test_direct_json_parser_compile_version_auto_healing():
+    from a2ui.schema.constants import VERSION_0_9_1
+
+    tf = DirectJsonFormat(
+        VERSION_0_9_1, catalogs=[BasicCatalog.get_config(VERSION_0_9_1)]
+    )
+    parser = tf.parser
+
+    # Payload with version "0.9" without leading 'v'
+    raw_payload = (
+        '[{"version": "0.9", "createSurface": {"surfaceId": "main",'
+        ' "catalogId":'
+        ' "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}]'
+    )
+    compiled = parser.compile(raw_payload)
+    assert len(compiled) == 1
+    assert compiled[0]["version"] == "v0.9"
+
+    # Payload with version omitted entirely
+    raw_payload_no_ver = (
+        '[{"createSurface": {"surfaceId": "main", "catalogId":'
+        ' "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}]'
+    )
+    compiled_no_ver = parser.compile(raw_payload_no_ver)
+    assert len(compiled_no_ver) == 1
+    assert compiled_no_ver[0]["version"] == "v0.9.1"
+

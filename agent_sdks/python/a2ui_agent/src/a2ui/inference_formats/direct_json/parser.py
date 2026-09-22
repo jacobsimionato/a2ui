@@ -117,7 +117,8 @@ class DirectJsonParser(Parser):
         Returns:
             A list of compiled A2UI message dictionaries.
         """
-        json_data = parse_and_fix(format_content)
+        target_version = getattr(self._catalog, "version", None) if self._catalog else None
+        json_data = parse_and_fix(format_content, target_version=target_version)
         if self._validator:
             self._validator.validate(json_data)
         return json_data

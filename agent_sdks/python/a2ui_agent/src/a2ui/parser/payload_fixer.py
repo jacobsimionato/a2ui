@@ -15,25 +15,28 @@
 import json
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from a2ui.core import A2uiParseError
 
 
 logger = logging.getLogger(__name__)
 
 
-def parse_and_fix(payload: str) -> List[Dict[str, Any]]:
+def parse_and_fix(
+    payload: str, target_version: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Validates and applies autofixes to a raw JSON string and returns the parsed payload.
 
     Args:
       payload: The raw JSON string from the LLM.
+      target_version: Optional canonical protocol version to normalize or inject if missing.
 
     Returns:
       A parsed and potentially fixed payload (list of dicts).
     """
     normalized_payload = _normalize_smart_quotes(payload)
     try:
-        a2ui_json = _parse(normalized_payload)
+        a2ui_json = _parse(normalized_payload, target_version=target_version)
         return a2ui_json
     except (
         json.JSONDecodeError,
@@ -42,11 +45,32 @@ def parse_and_fix(payload: str) -> List[Dict[str, Any]]:
     ) as e:
         logger.warning(f"Initial A2UI payload validation failed: {e}")
         updated_payload = _remove_trailing_commas(normalized_payload)
-        a2ui_json = _parse(updated_payload)
+        a2ui_json = _parse(updated_payload, target_version=target_version)
         return a2ui_json
 
 
-def _parse(payload: str) -> List[Dict[str, Any]]:
+def _normalize_version(
+    msg: Dict[str, Any], target_version: Optional[str] = None
+) -> None:
+    """Auto-heals the protocol version on an A2UI message dictionary."""
+    canonical_target = None
+    if target_version and target_version not in ("0.8", "v0.8"):
+        canonical_target = (
+            target_version if target_version.startswith("v") else f"v{target_version}"
+        )
+
+    ver = msg.get("version")
+    if ver is not None and isinstance(ver, str):
+        # Normalize numeric versions (e.g. "0.9", "0.9.1", "1.0") to include the 'v' prefix
+        if not ver.startswith("v"):
+            msg["version"] = f"v{ver}"
+    elif ver is None and canonical_target:
+        msg["version"] = canonical_target
+
+
+def _parse(
+    payload: str, target_version: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Parses the payload and returns a list of A2UI JSON objects."""
     try:
         a2ui_json = json.loads(payload)
@@ -55,6 +79,9 @@ def _parse(payload: str) -> List[Dict[str, Any]]:
                 "Received a single JSON object, wrapping in a list for validation."
             )
             a2ui_json = [a2ui_json]
+        for item in a2ui_json:
+            if isinstance(item, dict):
+                _normalize_version(item, target_version=target_version)
         return a2ui_json
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse JSON: {e}")

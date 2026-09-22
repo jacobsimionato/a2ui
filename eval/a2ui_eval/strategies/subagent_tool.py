@@ -78,7 +78,7 @@ def a2ui_specialist() -> Tool:
         output = await get_model().generate(messages)
         if output.completion:
             try:
-                parts = parse_response(output.completion)
+                parts = direct_json_format.parser.parse_response(output.completion)
                 all_messages = []
                 for part in parts:
                     if part.a2ui_json:

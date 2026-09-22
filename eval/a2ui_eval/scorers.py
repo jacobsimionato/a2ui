@@ -75,7 +75,7 @@ def a2ui_scorer(version: str) -> Scorer:
             )
 
         try:
-            parts = parse_response(answer_text)
+            parts = direct_json_format.parser.parse_response(answer_text)
             all_messages = []
             for part in parts:
                 if part.a2ui_json:

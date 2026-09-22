@@ -54,3 +54,38 @@ class TestPayloadFixer(unittest.TestCase):
         self.assertEqual(len(res), 1)
         components = res[0]['createSurface']['components']
         self.assertEqual(components[0]['text'], 'Hello world')
+
+    def test_normalize_version_without_v(self):
+        """Verify version strings missing the leading 'v' (e.g. '0.9') are normalized."""
+        payload = '[{"version": "0.9", "createSurface": {"surfaceId": "s1"}}]'
+        res = parse_and_fix(payload)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["version"], "v0.9")
+
+    def test_normalize_version_1_0(self):
+        """Verify version '1.0' is normalized to 'v1.0'."""
+        payload = '[{"version": "1.0", "createSurface": {"surfaceId": "s1"}}]'
+        res = parse_and_fix(payload)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["version"], "v1.0")
+
+    def test_inject_missing_version_with_target(self):
+        """Verify missing version is injected when target_version is specified."""
+        payload = '[{"createSurface": {"surfaceId": "s1"}}]'
+        res = parse_and_fix(payload, target_version="0.9.1")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["version"], "v0.9.1")
+
+    def test_preserve_existing_valid_version(self):
+        """Verify existing valid version strings starting with 'v' are preserved."""
+        payload = '[{"version": "v0.9", "createSurface": {"surfaceId": "s1"}}]'
+        res = parse_and_fix(payload, target_version="0.9.1")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["version"], "v0.9")
+
+    def test_v08_target_version_does_not_inject_version(self):
+        """Verify target_version='0.8' does not inject a version property."""
+        payload = '[{"beginRendering": {"surfaceId": "s1"}}]'
+        res = parse_and_fix(payload, target_version="0.8")
+        self.assertEqual(len(res), 1)
+        self.assertNotIn("version", res[0])
