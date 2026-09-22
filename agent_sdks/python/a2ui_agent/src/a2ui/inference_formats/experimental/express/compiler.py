@@ -20,6 +20,8 @@ AST, compiling it directly into standard A2UI v1.0 JSON messages.
 The grammar for A2UI Express is defined in Express.g4.
 """
 
+import json
+import re
 from typing import Any, Optional, Union
 from antlr4 import InputStream, CommonTokenStream
 from a2ui.core.catalog import Catalog
@@ -192,15 +194,254 @@ class ExpressCompiler:
         self,
         catalog: Union[Catalog[Any, Any], A2uiCatalog],
         version: str = "v1.0",
+        permissive_root: bool = False,
+        coerce_primitives: bool = False,
     ):
         """Initializes the compiler with the specified catalog.
 
         Args:
             catalog: A Catalog or an A2uiCatalog.
             version: Target A2UI protocol version ("v0.9", "v0.9.1", or "v1.0").
+            permissive_root: Whether to auto-promote unassigned components to 'root'.
+            coerce_primitives: Whether to coerce primitive property types using catalog schemas.
         """
         self.helper = CatalogSchemaHelper(catalog)
         self.version = version
+        self.permissive_root = permissive_root
+        self.coerce_primitives = coerce_primitives
+
+    def _get_expected_primitive_type(
+        self, schema: Optional[dict[str, Any]]
+    ) -> Optional[str]:
+        """Resolves expected primitive type (number, integer, boolean, string) from a schema."""
+        if not isinstance(schema, dict):
+            return None
+        t = schema.get("type")
+        if t in ("integer", "number", "boolean", "string"):
+            return t
+        ref = schema.get("$ref")
+        if isinstance(ref, str):
+            if "DynamicNumber" in ref or "Number" in ref:
+                return "number"
+            if "DynamicInteger" in ref or "Integer" in ref:
+                return "integer"
+            if "DynamicBoolean" in ref or "Boolean" in ref:
+                return "boolean"
+            if "DynamicString" in ref or "String" in ref:
+                return "string"
+        for k in ("anyOf", "oneOf", "allOf"):
+            if k in schema and isinstance(schema[k], list):
+                for sub in schema[k]:
+                    sub_t = self._get_expected_primitive_type(sub)
+                    if sub_t:
+                        return sub_t
+        return None
+
+    def _coerce_property_value(
+        self, comp_name: str, prop_name: str, val: Any
+    ) -> Any:
+        """Coerces property value (numbers, booleans) based on catalog schema."""
+        prop_schema = self.helper.get_property_schema(comp_name, prop_name)
+        if isinstance(val, str) and (val.startswith("$/") or val.startswith("$")):
+            if self.permissive_root and prop_schema and _schema_allows_databinding(prop_schema):
+                clean_path = val[2:] if val.startswith("$/") else val[1:]
+                return {"path": "/" + clean_path.lstrip("/")}
+            return val
+        expected_type = self._get_expected_primitive_type(prop_schema)
+        if expected_type in ("number", "integer"):
+            if isinstance(val, str):
+                try:
+                    cleaned = val.strip()
+                    if cleaned.endswith("%"):
+                        cleaned = cleaned[:-1].strip()
+                    if cleaned.startswith("+"):
+                        cleaned = cleaned[1:].strip()
+                    if expected_type == "integer":
+                        return int(float(cleaned))
+                    else:
+                        if "." in cleaned or "e" in cleaned.lower():
+                            return float(cleaned)
+                        else:
+                            return int(cleaned)
+                except (ValueError, TypeError):
+                    pass
+            elif (
+                isinstance(val, float)
+                and expected_type == "integer"
+                and val.is_integer()
+            ):
+                return int(val)
+        elif expected_type == "boolean":
+            if isinstance(val, str):
+                cleaned = val.strip().lower()
+                if cleaned in ("true", "1"):
+                    return True
+                elif cleaned in ("false", "0"):
+                    return False
+        return val
+
+    def _normalize_colons_in_call_args(self, text: str) -> str:
+        """Normalizes syntax in Express DSL for permissive parsing."""
+        import json
+
+        # 1. Leading /path = -> $/path =
+        text = re.sub(r"(?m)^(\s*)(/[a-zA-Z0-9_./]+)\s*=", r"\1$\2 =", text)
+
+        # 2. Quoted "${/path}" and unquoted ${/path}, ${.name} -> $/path, $name
+        text = re.sub(r'["\']\$\{/([a-zA-Z0-9_./]+)\}["\']', r'$/\1', text)
+        text = re.sub(r'["\']\$\{([a-zA-Z0-9_./]+)\}["\']', r'$\1', text)
+        text = re.sub(r"\$\{/([a-zA-Z0-9_./]+)\}", r"$/\1", text)
+        text = re.sub(r"\$\{([a-zA-Z0-9_./]+)\}", r"$\1", text)
+        text = re.sub(r"\$\{\.([a-zA-Z0-9_]+)\}", r"$\1", text)
+        text = re.sub(r"\$\.([a-zA-Z0-9_]+)", r"$\1", text)
+
+        # 3. Strip JSX expression wrappers: { `...` } -> `...`
+        text = re.sub(r"\{\s*(`[^`]*`|\"[^\"]*\")\s*\}", r"\1", text)
+
+        # 4. Strip pseudo message wrappers
+        text = re.sub(r"(?m)^\s*createSurface\([^)]*\)\s*$", "", text)
+        text = re.sub(r"updateComponents\s*\(\s*(root\s*=)", r"\1", text)
+
+        # 4. Handle root concatenation (root = root + Component or root += Component)
+        if re.search(r"(?m)^\s*root\s*(?:=\s*root\s*\+|\+=)\s*", text):
+            child_counter = 0
+            child_vars = []
+
+            def _repl_concat(m: re.Match) -> str:
+                nonlocal child_counter
+                child_counter += 1
+                v = f"_concat_child_{child_counter}"
+                child_vars.append(v)
+                return f"{v} = "
+
+            text = re.sub(r"(?m)^\s*root\s*(?:=\s*root\s*\+|\+=)\s*", _repl_concat, text)
+            if child_vars:
+                text = re.sub(r"(?m)^\s*root\s*=\s*Surface\([^)]*\)\s*$", "", text)
+                text = text.rstrip() + f"\nroot = Column([{','.join(child_vars)}])\n"
+
+        # 5. Bracketed kwargs: Component([ key = val ]) -> Component(key = val)
+        text = re.sub(
+            r"\(\[\s*([A-Za-z_][A-Za-z0-9_]*\s*[:=][^\]]*)\]\)",
+            r"(\1)",
+            text,
+            flags=re.DOTALL,
+        )
+
+        if self.permissive_root:
+            # 6. Dotted component or subcomponent calls: e.g. Tabs.Tab(...) -> Tab(...)
+            text = re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\.([A-Za-z_][A-Za-z0-9_]*)\(", r"\1(", text)
+
+
+        out = []
+        i = 0
+        n = len(text)
+        stack = []
+        in_string = False
+        string_char = ""
+        triple_string = False
+
+        while i < n:
+            if not in_string and (i + 2 < n) and (text[i : i + 3] in ('"""', "'''")):
+                in_string = True
+                string_char = text[i : i + 3]
+                triple_string = True
+                out.append('"""')
+                i += 3
+                continue
+            elif in_string and triple_string:
+                if text[i : i + 3] == string_char:
+                    in_string = False
+                    triple_string = False
+                    out.append('"""')
+                    i += 3
+                    continue
+                else:
+                    out.append(text[i])
+                    i += 1
+                    continue
+            elif not in_string and text[i] == "`":  # backtick template string
+                j = i + 1
+                content = []
+                while j < n and text[j] != "`":
+                    if text[j] == "\\" and j + 1 < n:
+                        content.append(text[j : j + 2])
+                        j += 2
+                    else:
+                        content.append(text[j])
+                        j += 1
+                if j < n:
+                    j += 1
+                out.append(json.dumps("".join(content)))
+                i = j
+                continue
+            elif not in_string and text[i] == "'":  # single-quoted string
+                j = i + 1
+                content = []
+                while j < n and text[j] != "'":
+                    if text[j] == "\\" and j + 1 < n:
+                        content.append(text[j : j + 2])
+                        j += 2
+                    else:
+                        content.append(text[j])
+                        j += 1
+                if j < n:
+                    j += 1
+                out.append(json.dumps("".join(content)))
+                i = j
+                continue
+            elif not in_string and text[i] == '"':
+                in_string = True
+                string_char = '"'
+                triple_string = False
+                out.append(text[i])
+                i += 1
+                continue
+            elif in_string and not triple_string:
+                if text[i] == "\\" and i + 1 < n:
+                    out.append(text[i : i + 2])
+                    i += 2
+                    continue
+                elif text[i] == string_char:
+                    in_string = False
+                out.append(text[i])
+                i += 1
+                continue
+
+            if text[i] == "#" or (text[i] == "/" and i + 1 < n and text[i + 1] == "/"):
+                while i < n and text[i] != "\n":
+                    out.append(text[i])
+                    i += 1
+                continue
+
+            matching_open = {")": "(", "]": "[", "}": "{"}
+            closing_map = {"(": ")", "[": "]", "{": "}"}
+            ch = text[i]
+            if ch in ("(", "{", "["):
+                stack.append(ch)
+                out.append(ch)
+            elif ch in (")", "]", "}"):
+                target_open = matching_open[ch]
+                if target_open in stack:
+                    while stack and stack[-1] != target_open:
+                        unclosed = stack.pop()
+                        out.append(closing_map[unclosed])
+                    if stack and stack[-1] == target_open:
+                        stack.pop()
+                    out.append(ch)
+                else:
+                    # Unmatched closing delimiter; ignore in permissive mode
+                    pass
+            elif ch == ":" and stack and stack[-1] == "(":
+                out.append("=")
+            elif ch == "=" and stack and stack[-1] == "{":
+                out.append(":")
+            else:
+                out.append(ch)
+            i += 1
+        while stack:
+            open_delim = stack.pop()
+            out.append(closing_map[open_delim])
+        return "".join(out)
 
     def compile(
         self,
@@ -248,6 +489,18 @@ class ExpressCompiler:
                 lines.append(line)
 
         dsl_body = "\n".join(lines)
+
+        trimmed_body = dsl_body.strip()
+        if trimmed_body.startswith("```"):
+            fence_lines = trimmed_body.splitlines()
+            if fence_lines and fence_lines[0].strip().startswith("```"):
+                fence_lines = fence_lines[1:]
+            if fence_lines and fence_lines[-1].strip() == "```":
+                fence_lines = fence_lines[:-1]
+            dsl_body = "\n".join(fence_lines)
+
+        if self.permissive_root:
+            dsl_body = self._normalize_colons_in_call_args(dsl_body)
 
         # Use ANTLR to parse and construct the AST
         input_stream = InputStream(dsl_body)
@@ -339,7 +592,31 @@ class ExpressCompiler:
                     ):
                         target_delete_surface_id = kwargs["surfaceId"]
                 elif isinstance(parsed_val, dict) and "call" in parsed_val:
-                    standalone_function_calls.append((parsed_val, current_scope))
+                    call_name = parsed_val["call"]
+                    matched_comp = None
+                    if call_name in self.helper.components:
+                        matched_comp = call_name
+                    elif self.permissive_root:
+                        for c in self.helper.components:
+                            if c.lower() == call_name.lower():
+                                matched_comp = c
+                                break
+
+                    if self.permissive_root and matched_comp:
+                        parsed_val["call"] = matched_comp
+                        if current_scope is None:
+                            current_scope = _SurfaceScope(
+                                surface_id=surface_id, catalog_id=catalog_id
+                            )
+                            scopes.append(current_scope)
+                        if "root" not in current_scope.raw_symbols:
+                            current_scope.raw_symbols["root"] = parsed_val
+                        else:
+                            current_scope.raw_symbols[
+                                f"comp_{len(current_scope.raw_symbols)}"
+                            ] = parsed_val
+                    else:
+                        standalone_function_calls.append((parsed_val, current_scope))
             elif stmt_type == "ASSIGN":
                 var_name, parsed_val = stmt_args
                 if current_scope is None:
@@ -400,7 +677,10 @@ class ExpressCompiler:
                 _set_nested_path(data_model, path_name, compiled_val)
 
             if "root" not in scope.raw_symbols:
-                if scope.data_path_assignments:
+                if self.permissive_root and len(scope.raw_symbols) == 1:
+                    single_key = next(iter(scope.raw_symbols))
+                    scope.raw_symbols["root"] = scope.raw_symbols.pop(single_key)
+                elif scope.data_path_assignments:
                     result_messages.append({
                         "version": target_version,
                         SurfaceOperation.UPDATE_DATA: {
@@ -410,7 +690,8 @@ class ExpressCompiler:
                         },
                     })
                     continue
-                raise ExpressUndefinedRootError("root")
+                else:
+                    raise ExpressUndefinedRootError("root")
 
             compiled_components = []
             for var_name, ast in scope.raw_symbols.items():
@@ -485,6 +766,122 @@ class ExpressCompiler:
         args = ast.get("args", [])
         kwargs = ast.get("kwargs", {})
 
+        if comp_name not in self.helper.components and self.permissive_root:
+            if comp_name.lower() in ("component", "yourcomponent") and args and isinstance(args[0], str):
+                target_name = args[0]
+                for c in self.helper.components:
+                    if c.lower() == target_name.lower():
+                        comp_name = c
+                        ast["call"] = c
+                        args = args[1:]
+                        ast["args"] = args
+                        break
+            elif comp_name.lower() in (
+                "container",
+                "yourcontainer",
+                "topcomponent",
+                "box",
+                "group",
+                "wrapper",
+                "surface",
+                "view",
+                "section",
+                "mainlayout",
+                "yourcolumn",
+            ):
+                if "Column" in self.helper.components:
+                    comp_name = "Column"
+                    ast["call"] = "Column"
+                elif "Row" in self.helper.components:
+                    comp_name = "Row"
+                    ast["call"] = "Row"
+            elif comp_name.lower() == "numberfield":
+                comp_name = "TextField"
+                ast["call"] = "TextField"
+                if "variant" not in kwargs:
+                    kwargs["variant"] = "number"
+
+            for c in self.helper.components:
+                if c.lower() == comp_name.lower():
+                    comp_name = c
+                    ast["call"] = c
+                    break
+
+        if self.permissive_root and comp_name in ("Column", "Row") and len(args) > 1:
+            args = [args]
+            ast["args"] = args
+
+        if self.permissive_root and comp_name == "List":
+            data_arg = kwargs.pop("data", kwargs.pop("items", kwargs.pop("elements", None)))
+            template_arg = kwargs.pop("template", kwargs.pop("item", None))
+            if data_arg and template_arg and "children" not in kwargs:
+                kwargs["children"] = {"call": "_template", "args": [data_arg, template_arg]}
+            elif data_arg and "children" not in kwargs:
+                kwargs["children"] = data_arg
+
+        if self.permissive_root and comp_name == "ChoicePicker":
+            if "value" not in kwargs and "values" not in kwargs:
+                kwargs["value"] = []
+            if "options" not in kwargs:
+                kwargs["options"] = []
+
+        if self.permissive_root and comp_name == "Card":
+            if len(args) > 1 and "child" not in kwargs:
+                args = [{"call": "Column", "args": [args], "kwargs": {}}]
+                ast["args"] = args
+            if "child" not in kwargs and "children" not in kwargs:
+                if len(kwargs) == 1:
+                    kw_k, kw_v = next(iter(kwargs.items()))
+                    if kw_k.lower() in ("title", "header", "heading") and isinstance(kw_v, str):
+                        kwargs = {"child": {"call": "Text", "args": [], "kwargs": {"text": kw_v, "variant": "h2"}}}
+                    elif kw_k.lower() == "children":
+                        if isinstance(kw_v, list):
+                            kwargs = {"child": {"call": "Column", "args": [kw_v], "kwargs": {}}}
+                        else:
+                            kwargs = {"child": kw_v}
+                    else:
+                        kwargs = {"child": kw_v}
+                    ast["kwargs"] = kwargs
+                elif len(kwargs) > 1:
+                    card_children = []
+                    for k, v in kwargs.items():
+                        if k.lower() in ("title", "header", "heading") and isinstance(v, str):
+                            card_children.append({"call": "Text", "args": [], "kwargs": {"text": v, "variant": "h2"}})
+                        elif k.lower() == "children" and isinstance(v, list):
+                            card_children.extend(v)
+                        else:
+                            card_children.append(v)
+                    kwargs = {"child": {"call": "Column", "args": [card_children], "kwargs": {}}}
+                    ast["kwargs"] = kwargs
+            elif len(kwargs) > 1:
+                card_children = []
+                for k, v in kwargs.items():
+                    if k.lower() in ("title", "header", "heading") and isinstance(v, str):
+                        card_children.append({"call": "Text", "args": [], "kwargs": {"text": v, "variant": "h2"}})
+                    elif k.lower() == "child":
+                        card_children.append(v)
+                    elif k.lower() == "children" and isinstance(v, list):
+                        card_children.extend(v)
+                    else:
+                        card_children.append(v)
+                kwargs = {"child": {"call": "Column", "args": [card_children], "kwargs": {}}}
+                ast["kwargs"] = kwargs
+
+        if self.permissive_root and comp_name == "Modal":
+            if "content" not in kwargs and "child" not in kwargs and "children" not in kwargs:
+                if len(args) > 0:
+                    kwargs["content"] = args[0]
+            if "trigger" not in kwargs:
+                kwargs["trigger"] = {
+                    "call": "Button",
+                    "args": [],
+                    "kwargs": {
+                        "child": {"call": "Text", "args": [], "kwargs": {"text": "Open"}},
+                        "action": {"call": "Event", "args": ["openModal"], "kwargs": {}},
+                    },
+                }
+
+
         if comp_name not in self.helper.components:
             # Not a component, could be a standalone action/helper; skip writing as component
             return None
@@ -524,6 +921,97 @@ class ExpressCompiler:
 
         seen_properties = set()
         for prop_name, arg in prop_arg_pairs:
+            if prop_name not in properties and (
+                self.coerce_primitives or self.permissive_root
+            ):
+                for p in properties:
+                    if p.lower() == prop_name.lower():
+                        prop_name = p
+                        break
+                if prop_name not in properties:
+                    aliases = {
+                        "src": "url",
+                        "values": "value",
+                        "items": "children" if "children" in properties else None,
+                        "title": (
+                            "label"
+                            if "label" in properties
+                            else (
+                                "text"
+                                if "text" in properties
+                                else ("child" if "child" in properties else None)
+                            )
+                        ),
+                        "label": (
+                            "text"
+                            if "text" in properties
+                            else ("child" if "child" in properties else None)
+                        ),
+                        "text": (
+                            "label"
+                            if "label" in properties
+                            else ("child" if "child" in properties else None)
+                        ),
+                        "name": (
+                            "text"
+                            if "text" in properties
+                            else ("label" if "label" in properties else None)
+                        ),
+                        "children": (
+                            "content"
+                            if "content" in properties
+                            else ("child" if "child" in properties else None)
+                        ),
+                        "child": (
+                            "content"
+                            if "content" in properties
+                            else ("children" if "children" in properties else None)
+                        ),
+                        "content": "child" if "child" in properties else None,
+                    }
+                    alias_target = aliases.get(prop_name.lower())
+                    if alias_target and alias_target in properties and alias_target not in seen_properties:
+                        prop_name = alias_target
+
+                if prop_name not in properties and self.permissive_root:
+                    if (
+                        prop_name.lower() in ("placeholder", "hint", "help")
+                        and "label" in properties
+                        and "label" not in seen_properties
+                    ):
+                        prop_name = "label"
+                    elif prop_name.lower() == "id":
+                        if isinstance(arg, str) and comp_dict.get("id", "").startswith("_inline_"):
+                            comp_dict["id"] = arg
+                        continue
+                    elif prop_name.lower() in (
+                        "title",
+                        "name",
+                        "key",
+                        "placeholder",
+                        "hint",
+                        "help",
+                        "style",
+                        "spacing",
+                        "padding",
+                        "margin",
+                        "color",
+                        "width",
+                        "height",
+                        "elevation",
+                        "direction",
+                        "numeric",
+                        "required",
+                        "min",
+                        "max",
+                        "step",
+                        "disabled",
+                        "group",
+                        "default",
+                        "visible",
+                    ):
+                        continue
+
             if prop_name not in properties:
                 raise ExpressUnknownPropertyError(comp_name, prop_name, properties)
             if prop_name in seen_properties:
@@ -539,6 +1027,44 @@ class ExpressCompiler:
                 ctx,
                 is_action=(prop_name in ["action", "submitAction"]),
             )
+            mapped_val = self._coerce_property_value(comp_name, prop_name, mapped_val)
+            if self.permissive_root and prop_name in ("child", "content"):
+                if isinstance(mapped_val, list):
+                    if len(mapped_val) == 1:
+                        mapped_val = mapped_val[0]
+                    elif len(mapped_val) > 1:
+                        ctx.inline_counter += 1
+                        col_id = f"_inline_{ctx.inline_counter}"
+                        ctx.extra_components.append({
+                            "id": col_id,
+                            "component": "Column",
+                            "children": mapped_val,
+                        })
+                        mapped_val = col_id
+                if (
+                    isinstance(mapped_val, str)
+                    and not mapped_val.startswith("_inline_")
+                    and mapped_val not in raw_symbols
+                ):
+                    ctx.inline_counter += 1
+                    inline_id = f"_inline_{ctx.inline_counter}"
+                    ctx.extra_components.append({
+                        "id": inline_id,
+                        "component": "Text",
+                        "text": mapped_val,
+                    })
+                    mapped_val = inline_id
+            if (
+                self.permissive_root
+                and prop_name == "children"
+                and not isinstance(mapped_val, list)
+                and not (
+                    isinstance(mapped_val, dict)
+                    and "componentId" in mapped_val
+                    and "path" in mapped_val
+                )
+            ):
+                mapped_val = [mapped_val]
             prop_schema = self.helper.get_property_schema(comp_name, prop_name)
             if prop_schema and not _schema_allows_databinding(prop_schema):
                 if _has_databinding(mapped_val):
@@ -552,7 +1078,16 @@ class ExpressCompiler:
                     ]
             enum_vals = self.helper.get_property_enum(comp_name, prop_name)
             if enum_vals and isinstance(mapped_val, str):
-                if mapped_val not in enum_vals:
+                matched_enum = None
+                for ev in enum_vals:
+                    if ev == mapped_val or (
+                        self.coerce_primitives and ev.lower() == mapped_val.lower()
+                    ):
+                        matched_enum = ev
+                        break
+                if matched_enum is not None:
+                    mapped_val = matched_enum
+                else:
                     raise ValueError(
                         f"Value '{mapped_val}' is not a valid enum choice for"
                         f" property '{prop_name}' of component '{comp_name}'."
@@ -633,6 +1168,23 @@ class ExpressCompiler:
                     })
             if compiled_checks:
                 comp_dict["checks"] = compiled_checks
+
+        if self.permissive_root:
+            if comp_name == "Button":
+                if "action" not in comp_dict:
+                    comp_dict["action"] = {"event": {"name": "click"}}
+                if "child" not in comp_dict:
+                    ctx.inline_counter += 1
+                    btn_text_id = f"_inline_{ctx.inline_counter}"
+                    ctx.extra_components.append({
+                        "id": btn_text_id,
+                        "component": "Text",
+                        "text": "Submit",
+                    })
+                    comp_dict["child"] = btn_text_id
+            elif comp_name == "ChoicePicker":
+                if "value" not in comp_dict:
+                    comp_dict["value"] = []
 
         ctx.active_value_path = None
         return {k: v for k, v in comp_dict.items() if v is not None}
@@ -716,7 +1268,57 @@ class ExpressCompiler:
                 fn_args = val["args"]
 
                 # Is it an inline component constructor?
-                if fn_name in self.helper.components:
+                is_comp = fn_name in self.helper.components
+                if not is_comp and self.permissive_root:
+                    if (
+                        fn_name.lower() in ("component", "yourcomponent")
+                        and fn_args
+                        and isinstance(fn_args[0], str)
+                    ):
+                        target_name = fn_args[0]
+                        for c in self.helper.components:
+                            if c.lower() == target_name.lower():
+                                fn_name = c
+                                val["call"] = c
+                                fn_args = fn_args[1:]
+                                val["args"] = fn_args
+                                is_comp = True
+                                break
+                    elif fn_name.lower() in (
+                        "container",
+                        "yourcontainer",
+                        "topcomponent",
+                        "box",
+                        "group",
+                        "wrapper",
+                        "surface",
+                        "view",
+                        "section",
+                        "mainlayout",
+                        "yourcolumn",
+                    ):
+                        if "Column" in self.helper.components:
+                            fn_name = "Column"
+                            val["call"] = "Column"
+                            is_comp = True
+                        elif "Row" in self.helper.components:
+                            fn_name = "Row"
+                            val["call"] = "Row"
+                            is_comp = True
+                    if not is_comp:
+                        if fn_name.lower() == "numberfield":
+                            fn_name = "TextField"
+                            val["call"] = "TextField"
+                            is_comp = True
+                        else:
+                            for c in self.helper.components:
+                                if c.lower() == fn_name.lower():
+                                    fn_name = c
+                                    val["call"] = c
+                                    is_comp = True
+                                    break
+
+                if is_comp:
                     ctx.inline_counter += 1
                     inline_id = f"_inline_{ctx.inline_counter}"
                     compiled_inline = self._compile_ast_node(
@@ -724,6 +1326,7 @@ class ExpressCompiler:
                     )
                     if compiled_inline:
                         ctx.extra_components.append(compiled_inline)
+                        return compiled_inline.get("id", inline_id)
                     return inline_id
 
                 # Is it a reserved Template signature?
@@ -736,6 +1339,11 @@ class ExpressCompiler:
                     path_val = self._compile_value(
                         fn_args[0], raw_symbols, ctx, is_action
                     )
+                    if isinstance(path_val, str):
+                        path_str = path_val.lstrip("$")
+                        if not path_str.startswith("/"):
+                            path_str = f"/{path_str}"
+                        path_val = {"path": path_str}
                     if not isinstance(path_val, dict) or "path" not in path_val:
                         raise ValueError(
                             "The first argument to _template must be a dynamic data"
@@ -744,18 +1352,47 @@ class ExpressCompiler:
                     comp_id_val = self._compile_value(
                         fn_args[1], raw_symbols, ctx, is_action
                     )
+                    if isinstance(comp_id_val, dict) and "id" in comp_id_val:
+                        comp_id_val = comp_id_val["id"]
                     return {"path": path_val["path"], "componentId": comp_id_val}
+
+                if self.permissive_root and fn_name.lower() == "tab":
+                    tab_kwargs = val.get("kwargs", {})
+                    tab_title = (
+                        tab_kwargs.get("title")
+                        or (fn_args[0] if len(fn_args) > 0 else "Tab")
+                    )
+                    tab_child = (
+                        tab_kwargs.get("child")
+                        or tab_kwargs.get("id")
+                        or (fn_args[1] if len(fn_args) > 1 else "")
+                    )
+                    return {
+                        "title": self._compile_value(tab_title, raw_symbols, ctx, is_action),
+                        "child": self._compile_value(tab_child, raw_symbols, ctx, is_action),
+                    }
 
                 # Is it a reserved Event signature?
                 if fn_name == "Event":
+                    fn_kwargs = val.get("kwargs", {})
+                    event_name_arg = (
+                        fn_kwargs.get("name")
+                        if "name" in fn_kwargs
+                        else (fn_args[0] if len(fn_args) > 0 else "")
+                    )
+                    context_arg = (
+                        fn_kwargs.get("context")
+                        if "context" in fn_kwargs
+                        else (fn_args[1] if len(fn_args) > 1 else {})
+                    )
                     compiled_event_name = (
-                        self._compile_value(fn_args[0], raw_symbols, ctx, is_action)
-                        if len(fn_args) > 0
+                        self._compile_value(event_name_arg, raw_symbols, ctx, is_action)
+                        if event_name_arg
                         else ""
                     )
                     raw_context = (
-                        self._compile_value(fn_args[1], raw_symbols, ctx, is_action)
-                        if len(fn_args) > 1
+                        self._compile_value(context_arg, raw_symbols, ctx, is_action)
+                        if context_arg
                         else {}
                     )
                     compiled_context = {}

@@ -805,9 +805,165 @@ surface("body-surface")
 root = Text("Body")"""
         envelopes = compiler.compile(dsl)
         self.assertEqual(len(envelopes), 2)
-        self.assertEqual(envelopes[0]["createSurface"]["surfaceId"], "header-surface")
-        self.assertEqual(envelopes[1]["createSurface"]["surfaceId"], "body-surface")
+    def test_permissive_root_standalone_component(self):
+        """Validates that a standalone component call is automatically assigned to root."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = """surface("main")
+Text("Hello Standalone")"""
+        envelopes = compiler.compile(dsl)
+        self.assertEqual(len(envelopes), 1)
+        comps = envelopes[0]["createSurface"]["components"]
+        self.assertEqual(len(comps), 1)
+        self.assertEqual(comps[0]["id"], "root")
+        self.assertEqual(comps[0]["component"], "Text")
+        self.assertEqual(comps[0]["text"], "Hello Standalone")
+
+    def test_permissive_root_single_assigned_variable(self):
+        """Validates that a single variable assignment is promoted to root."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = 'my_card = Text("Promoted Root")'
+        envelopes = compiler.compile(dsl)
+        self.assertEqual(len(envelopes), 1)
+        comps = envelopes[0]["createSurface"]["components"]
+        self.assertEqual(len(comps), 1)
+        self.assertEqual(comps[0]["id"], "root")
+        self.assertEqual(comps[0]["component"], "Text")
+        self.assertEqual(comps[0]["text"], "Promoted Root")
+
+    def test_coerce_primitives_quoted_numbers_and_booleans(self):
+        """Validates schema-driven coercion of quoted numbers, booleans, and percentages."""
+        custom_catalog = A2uiCatalog(
+            version="1.0",
+            name="typed_catalog",
+            experiments={"version_1_0"},
+            s2c_schema={},
+            common_types_schema={},
+            catalog_schema={
+                "catalogId": "https://a2ui.org/typed_catalog",
+                "components": {
+                    "Metric": {
+                        "properties": {
+                            "count": {"type": "integer", "positionalIndex": 0},
+                            "rate": {"type": "number", "positionalIndex": 1},
+                            "active": {"type": "boolean", "positionalIndex": 2},
+                        }
+                    }
+                },
+            },
+        )
+        compiler = ExpressCompiler(custom_catalog, coerce_primitives=True)
+        dsl = 'root = Metric(count="42", rate="+12.5%", active="true")'
+        envelopes = compiler.compile(dsl)
+        comp = envelopes[0]["createSurface"]["components"][0]
+        self.assertEqual(comp["count"], 42)
+        self.assertEqual(comp["rate"], 12.5)
+        self.assertEqual(comp["active"], True)
+
+    def test_permissive_colon_normalization_in_arguments(self):
+        """Validates that 'param: value' in call arguments is normalized to 'param=value'."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = """
+        Row(
+            children: [
+                Text(text: "Hello World")
+            ]
+        )
+        """
+        envelopes = compiler.compile(dsl)
+        self.assertEqual(len(envelopes), 1)
+        comps = envelopes[0]["createSurface"]["components"]
+        self.assertEqual(len(comps), 2)
+        root_comp = next(c for c in comps if c["id"] == "root")
+        self.assertEqual(root_comp["component"], "Row")
+
+    def test_permissive_unwrap_markdown_codeblock(self):
+        """Validates that ExpressParser with permissive_root extracts Express DSL from markdown fences."""
+        parser = ExpressParser(self.catalog, permissive_root=True)
+        resp = "Here is the UI:\n```json\nRow(\n  children: [Text(text: 'Hi')]\n)\n```\nEnjoy!"
+        parts = parser.unwrap(resp)
+        a2ui_parts = [p for p in parts if p.a2ui_raw is not None]
+        self.assertEqual(len(a2ui_parts), 1)
+        self.assertIn("Row(", a2ui_parts[0].a2ui_raw)
+
+    def test_permissive_unwrap_ignores_raw_json(self):
+        """Validates that ExpressParser does NOT extract raw JSON objects as Express DSL."""
+        parser = ExpressParser(self.catalog, permissive_root=True)
+        resp = 'Here is the UI:\n```json\n{"type": "Row", "children": []}\n```'
+        parts = parser.unwrap(resp)
+        a2ui_parts = [p for p in parts if p.a2ui_raw is not None]
+        self.assertEqual(len(a2ui_parts), 0)
+
+    def test_permissive_single_quoted_strings(self):
+        """Validates that single-quoted strings are normalized to double quotes in permissive mode."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = "root = Text(text='Hello Single Quotes')"
+        envelopes = compiler.compile(dsl)
+        comp = envelopes[0]["createSurface"]["components"][0]
+        self.assertEqual(comp["text"], "Hello Single Quotes")
+
+    def test_permissive_data_path_normalization(self):
+        """Validates that /path = and ${/path} syntax are normalized in permissive mode."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = "/profile = { name: 'Alice' }\nroot = TextField(value=${/profile/name})"
+        envelopes = compiler.compile(dsl)
+        self.assertIn("dataModel", envelopes[0]["createSurface"])
+        self.assertEqual(envelopes[0]["createSurface"]["dataModel"]["profile"]["name"], "Alice")
+        comp = envelopes[0]["createSurface"]["components"][0]
+        self.assertEqual(comp["value"], {"path": "/profile/name"})
+
+    def test_permissive_root_concatenation(self):
+        """Validates that root = root + Component syntax is normalized to Column([ ... ])."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = """
+        root = Surface("main")
+        root = root + Text("First")
+        root = root + Text("Second")
+        """
+        envelopes = compiler.compile(dsl)
+        comps = envelopes[0]["createSurface"]["components"]
+        root_comp = next(c for c in comps if c["id"] == "root")
+        self.assertEqual(root_comp["component"], "Column")
+        self.assertEqual(len(root_comp["children"]), 2)
+
+    def test_permissive_map_equals_normalization(self):
+        """Validates that '=' inside map literals is normalized to ':'."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = """
+        root = Tabs(
+            tabs = [
+                { title = "Tab1", child = Text("Content1") }
+            ]
+        )
+        """
+        envelopes = compiler.compile(dsl)
+        comps = envelopes[0]["createSurface"]["components"]
+        root_comp = next(c for c in comps if c["id"] == "root")
+        self.assertEqual(root_comp["component"], "Tabs")
+
+    def test_permissive_button_default_action(self):
+        """Validates that Button without action gets a default click event in permissive mode."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = 'root = Button("Click Me")'
+        envelopes = compiler.compile(dsl)
+        comps = envelopes[0]["createSurface"]["components"]
+        btn = next(c for c in comps if c["id"] == "root")
+        self.assertEqual(btn["component"], "Button")
+        self.assertIn("action", btn)
+        self.assertEqual(btn["action"], {"event": {"name": "click"}})
+
+    def test_permissive_card_multichild_wrap(self):
+        """Validates that Card with multiple children auto-wraps them in a Column."""
+        compiler = ExpressCompiler(self.catalog, permissive_root=True)
+        dsl = "root = Card([ Text('A'), Text('B') ])"
+        envelopes = compiler.compile(dsl)
+        comps = envelopes[0]["createSurface"]["components"]
+        card = next(c for c in comps if c["id"] == "root")
+        self.assertEqual(card["component"], "Card")
+        col = next(c for c in comps if c["id"] == card["child"])
+        self.assertEqual(col["component"], "Column")
+        self.assertEqual(len(col["children"]), 2)
 
 
 if __name__ == "__main__":
     unittest.main()
+

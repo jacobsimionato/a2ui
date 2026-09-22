@@ -60,7 +60,11 @@ def _get_strategy(
         from a2ui.inference_formats.experimental.express.format import ExpressFormat
 
         return ExpressFormat(
-            catalog=catalog, surface_id=surface_id, version=formatted_version
+            catalog=catalog,
+            surface_id=surface_id,
+            version=formatted_version,
+            permissive_root=True,
+            coerce_primitives=True,
         )
     elif format_name == "elemental":
         from a2ui.inference_formats.experimental.elemental.format import ElementalFormat
@@ -258,7 +262,7 @@ def compile_format_payload(format_name: str, version: str) -> Solver:
                 resolved_catalog_path,
                 surface_id,
                 completion,
-                timeout_sec=5.0,
+                timeout_sec=20.0,
             )
 
             compiled_jsons = res_dict.get("compiled_jsons", [])

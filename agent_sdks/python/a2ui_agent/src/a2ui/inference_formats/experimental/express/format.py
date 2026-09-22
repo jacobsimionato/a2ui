@@ -35,6 +35,8 @@ class ExpressFormat(InferenceFormat):
         surface_id: str = "main",
         examples_path: Optional[str] = None,
         version: str = "v1.0",
+        permissive_root: bool = False,
+        coerce_primitives: bool = False,
     ):
         """Initializes the Express DSL inference format.
 
@@ -43,11 +45,15 @@ class ExpressFormat(InferenceFormat):
             surface_id: The surface identifier for layout targeting.
             examples_path: Optional path to markdown files containing examples.
             version: Target A2UI protocol version ("v0.9", "v0.9.1", or "v1.0").
+            permissive_root: Whether to auto-promote unassigned components to 'root'.
+            coerce_primitives: Whether to coerce primitive property types using catalog schemas.
         """
         self.catalog = catalog
         self.surface_id = surface_id
         self.examples_path = examples_path
         self.version = version
+        self.permissive_root = permissive_root
+        self.coerce_primitives = coerce_primitives
         self._prompt_generator: Optional[ExpressPromptGenerator] = None
 
     def _ensure_catalog(self) -> None:
@@ -73,4 +79,10 @@ class ExpressFormat(InferenceFormat):
     def parser(self) -> Parser:
         """The parser instance configured for this Express format."""
         self._ensure_catalog()
-        return ExpressParser(self.catalog, self.surface_id, version=self.version)
+        return ExpressParser(
+            self.catalog,
+            self.surface_id,
+            version=self.version,
+            permissive_root=self.permissive_root,
+            coerce_primitives=self.coerce_primitives,
+        )

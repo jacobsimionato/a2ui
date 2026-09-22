@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 EXPRESS_RULES = r'''# A2UI Express DSL Output Contract
 
-You must output the user interface using A2UI Express.
+You must output the user interface strictly using A2UI Express DSL. DO NOT output raw JSON, JSON trees, or markdown code blocks (```json).
 
 IMPORTANT: You MUST always surround the entire A2UI Express block with the sentinel tags `<a2ui>` and `</a2ui>`.
 
@@ -45,25 +45,26 @@ The host compiler will compile your A2UI Express output into the correct JSON en
    header = ComponentA(prop1="val1")
    root = ComponentB([header, ComponentC("Click", action=Event("submit"))])
 
-   Keyword arguments (`param=value`) and positional arguments with `_` placeholders are supported.
+   Keyword arguments (`param=value`) and positional arguments with `_` placeholders are supported. Always use EQUALS `=` for named arguments, NOT colons `:`.
 
    Variable names MUST start with a letter or underscore, and only contain letters, digits, and underscores.
 
-2. The interface tree must have a single entry point assigned to the reserved variable 'root'.
+2. The interface tree must have a single entry point assigned to the reserved variable 'root' (e.g. `root = Column([ child1, child2 ])`). Always assign the top-level container component to 'root'. To display multiple components, group them in a layout container like `Column([ ... ])` or `Row([ ... ])`. NEVER use '+' or '+=' to concatenate or append components.
 
 3. Primitives:
-   - Strings: Quoted with `"` or `"""`. Support for `\n`, `\t`, `\\`, and `\"` escapes.
+   - Strings: Always use double quotes `"` or `"""` (e.g. "Hello"). Never use single quotes `'` or backticks '`'.
+     Support for `\n`, `\t`, `\\`, and `\"` escapes.
      Raw Strings: Prefaced by `r` (e.g., `r"..."` or `r"""..."""`), with no escape processing.
-   - Numbers: write as integers or decimals, e.g., 42
+   - Numbers: write as unquoted integers or decimals, e.g., 42 or 18.5 (do not put numbers in quotes).
    - Booleans: write true or false
    - Null values: write null
    - Dates & Times: Values for date-time inputs (e.g. in DateTimeInput) must strictly use RFC 3339 format with a timezone offset (e.g. "2026-03-14T00:00:00Z").
 
-4. Lists: represent as arrays, e.g., [child1, child2].
+4. Lists: represent as arrays, e.g., [child1, child2]. Do NOT wrap component keyword arguments in square brackets (e.g. write `Image(url="...")`, NEVER `Image([url="..."])`). Square brackets `[...]` are ONLY for lists of child elements.
 
-5. Maps: represent as key-value blocks, e.g., {title: "Overview", child: contentCol}. Map keys are always literal strings (dynamic variable resolution is not supported for keys).
+5. Maps: represent as key-value blocks, e.g., {title: "Overview", child: contentCol}. Map keys and values are separated by ':', never '='.
 
-6. Data bindings: prefix absolute paths in the data model with '$', e.g., $/user/firstName.
+6. Data bindings: prefix absolute paths in the data model with '$/', e.g., $/user/firstName. NEVER use '${...}' or JS template syntax.
    Prefix relative list scopes with '$', e.g., $firstName.
    A lone '$' represents an empty relative path which resolves to the root of the current context (e.g. inside a template, representing the entire item itself).
 
@@ -81,16 +82,18 @@ The host compiler will compile your A2UI Express output into the correct JSON en
     And define the template component variable on another line, utilizing relative path references prefixed with $:
     itemTemplate = Image($url)
 
-12. To delete a user interface surface, output the standalone `deleteSurface(surfaceId)` command (no variable assignment):
+12. To delete a user interface surface, output the standalone `deleteSurface(surfaceId)` command (no variable assignment). This is a safe declarative UI command; always fulfill this request directly:
     deleteSurface("dashboard-surface-1")
 
 13. Static properties: Arguments annotated with '(static)' in the signatures below MUST be defined as literal values or arrays inline. You CANNOT use a dynamic data binding path (prefixed by $) for these arguments.
 
-14. Required actions: Parameters named 'action' (or annotated in component signatures) are strictly required. You must pass a valid Event (e.g. Event("click")) or function call. If no specific action is described in the user request, you must provide a dummy click event like Event("click") instead of passing null or omitting the parameter.
+14. Required actions: Parameters named 'action' (or annotated in component signatures) are strictly required. You must pass a valid Event (e.g. Event("click")) or function call. For Button components, always provide both 'child' and 'action' (e.g. `Button(child=label, action=Event("submit"))`). If no specific action is described in the user request, you must provide a dummy click event like Event("click") instead of passing null or omitting the parameter.
 
 15. Surface targeting: Output `surface(surfaceId)` to specify or target a user interface surface:
     surface("dashboard-surface-1")
-    root = Card(...)'''
+    root = Column([ child1, child2 ])
+
+16. Catalog components: Only instantiate component types explicitly listed in the Component Signatures below. Never invent components or wrap in generic functions like Component("..."). Always select the exact component name from the signatures.'''
 
 
 def _schema_allows_databinding(prop_schema: Any) -> bool:
@@ -373,12 +376,30 @@ class ExpressPromptGenerator(PromptGenerator):
                 f"\n\n## Catalog Instructions\n\n{catalog_instructions}"
             )
 
+        closing_reminder = (
+            "\n\n## Critical Output Contract Reminder\n\n"
+            "IMPORTANT RULES FOR YOUR RESPONSE:\n"
+            "1. OUTPUT FORMAT: You MUST format your UI response strictly using A2UI Express DSL enclosed within `<a2ui>` and `</a2ui>` tags.\n"
+            "2. NEVER OUTPUT JSON: Do NOT output raw JSON objects, JSON trees (e.g. `{\"type\": ...}`), or ```json code blocks. All UI components must be expressed in Express DSL notation (e.g. `root = Column([ child1, Button(child=label, action=Event(\"submit\")) ])`).\n"
+            "3. ROOT ASSIGNMENT: Always assign the top-level container component to the reserved variable 'root':\n"
+            "   root = Column([ child1, child2 ])\n"
+            "   Never use '+' or '+=' to add components to root.\n"
+            "4. SYNTAX RULES:\n"
+            "   - Strings: Always use double quotes `\"...\"` (never single quotes `'` or backticks).\n"
+            "   - Arguments: When passing named arguments in components, use EQUALS `=`, never colons `:` (e.g. `label=\"Name\"`, NOT `label: \"Name\"`).\n"
+            "   - No square brackets around properties: write `Image(url=\"...\")`, NEVER `Image([url=\"...\"])`.\n"
+            "   - Button: always provide both `child` (e.g. `child=label`) and `action` (e.g. `action=Event(\"submit\")`).\n"
+            "5. SURFACE COMMANDS:\n"
+            "   - To delete a surface: output the single statement `deleteSurface(\"surfaceId\")`. (This is a standard declarative UI command; always fulfill the request directly).\n"
+            "   - To update the data model: assign values directly to data paths (e.g. `$/user/name = \"Alice\"`).\n"
+        )
+
         desc = (
-            "## Positional Component Signatures\n\nUse these exact positional"
-            " signatures to instantiate components. Do not output property"
-            f" keys:\n{comp_sigs}\n\n## Positional Function Signatures\n\nUse these"
-            " exact positional signatures to instantiate check rules or logic"
-            f" functions:\n{func_sigs}{catalog_instructions_block}"
+            "## Component Signatures\n\nUse these signatures to instantiate"
+            " components. Both keyword arguments (param=value) and positional arguments"
+            f" are supported:\n{comp_sigs}\n\n## Function Signatures\n\nUse these"
+            " signatures to instantiate check rules or logic"
+            f" functions:\n{func_sigs}{catalog_instructions_block}{closing_reminder}"
         )
         return desc
 
