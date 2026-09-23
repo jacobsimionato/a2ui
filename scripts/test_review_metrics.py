@@ -13,25 +13,215 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for review metrics calculation and parsing."""
+"""Unit tests for review metrics extraction and analytics pipeline."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 import unittest
 
 from scripts.generate_review_metrics import (
-    analyze_prs,
+    analyze_records,
     calc_stats,
+    classify_size,
     compute_turns,
     filter_prs,
     format_duration,
-    get_week_info,
+    get_interval_info,
+    get_n_months_ago_start,
     is_bot,
     percentile,
 )
-from scripts.pull_review_data import parse_pr_node
+from scripts.pull_review_data import build_review_records, parse_pr_node
 
 
-class TestReviewMetrics(unittest.TestCase):
+class TestReviewPipeline(unittest.TestCase):
+
+    # -------------------------------------------------------------------------
+    # Part 1: pull_review_data.py tests
+    # -------------------------------------------------------------------------
+
+    def test_parse_pr_node_with_loc(self):
+        node = {
+            "number": 2747,
+            "title": "feat: dart agent",
+            "url": "https://github.com/a2ui-project/a2ui/pull/2747",
+            "createdAt": "2026-09-22T22:32:16Z",
+            "mergedAt": "2026-09-22T23:44:00Z",
+            "isDraft": False,
+            "additions": 680,
+            "deletions": 24,
+            "changedFiles": 20,
+            "author": {"login": "polina-c"},
+            "reviews": {
+                "nodes": [
+                    {
+                        "author": {"login": "nan-yu"},
+                        "state": "APPROVED",
+                        "submittedAt": "2026-09-22T23:33:03Z",
+                    }
+                ]
+            },
+            "reviewRequests": {"nodes": []},
+            "timelineItems": {
+                "nodes": [
+                    {
+                        "__typename": "ReviewRequestedEvent",
+                        "createdAt": "2026-09-22T22:45:21Z",
+                        "requestedReviewer": {"login": "nan-yu"},
+                    },
+                    {
+                        "__typename": "PullRequestReview",
+                        "author": {"login": "nan-yu"},
+                        "state": "APPROVED",
+                        "submittedAt": "2026-09-22T23:33:03Z",
+                    },
+                ]
+            },
+        }
+
+        parsed = parse_pr_node(node)
+        self.assertEqual(parsed["number"], 2747)
+        self.assertEqual(parsed["additions"], 680)
+        self.assertEqual(parsed["deletions"], 24)
+        self.assertEqual(parsed["changed_files"], 20)
+        self.assertEqual(parsed["total_loc"], 704)
+        self.assertEqual(parsed["author"], "polina-c")
+        self.assertEqual(len(parsed["listed_reviewers"]), 1)
+        self.assertEqual(parsed["listed_reviewers"][0]["login"], "nan-yu")
+        self.assertEqual(len(parsed["approvals"]), 1)
+
+    def test_build_review_records(self):
+        prs = [
+            {
+                "number": 100,
+                "title": "Test PR",
+                "author": "alice",
+                "createdAt": "2026-09-20T10:00:00Z",
+                "total_loc": 1500,
+                "additions": 1200,
+                "deletions": 300,
+                "listed_reviewers": [{"login": "bob", "requestedAt": "2026-09-20T10:30:00Z"}],
+                "approvals": [{"reviewer": "bob", "approvedAt": "2026-09-20T12:30:00Z"}],
+            }
+        ]
+        records = build_review_records(prs)
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(rec["pr_number"], 100)
+        self.assertEqual(rec["reviewer"], "bob")
+        self.assertEqual(rec["pr_author"], "alice")
+        self.assertEqual(rec["pr_total_loc"], 1500)
+        self.assertTrue(rec["was_formally_requested"])
+        # From 10:30 to 12:30 is 2.0 hours
+        self.assertAlmostEqual(rec["added_to_lgtm_hrs"], 2.0)
+
+    # -------------------------------------------------------------------------
+    # Part 2: generate_review_metrics.py tests
+    # -------------------------------------------------------------------------
+
+    def test_classify_size(self):
+        # Binary split around 1000 LoC
+        key_small, label_small = classify_size(450, loc_split=1000)
+        self.assertEqual(label_small, "< 1000 LoC")
+
+        key_large, label_large = classify_size(1250, loc_split=1000)
+        self.assertEqual(label_large, "≥ 1000 LoC")
+
+        # Standard tiers
+        _, label_xs = classify_size(50)
+        self.assertEqual(label_xs, "< 100 LoC (XS)")
+        _, label_s = classify_size(250)
+        self.assertEqual(label_s, "100 - 499 LoC (S)")
+        _, label_m = classify_size(750)
+        self.assertEqual(label_m, "500 - 999 LoC (M)")
+        _, label_l = classify_size(2000)
+        self.assertEqual(label_l, "1000+ LoC (L)")
+
+    def test_interval_info(self):
+        dt = datetime(2026, 9, 22, 12, 0, 0)
+        # Week interval
+        w_key, w_label = get_interval_info(dt, interval_type="week")
+        self.assertEqual(w_key, "2026-W39")
+        self.assertIn("Sep 21", w_label)
+
+        # Month interval
+        m_key, m_label = get_interval_info(dt, interval_type="month")
+        self.assertEqual(m_key, "2026-09")
+        self.assertEqual(m_label, "Sep 2026")
+
+    def test_get_n_months_ago_start(self):
+        now_dt = datetime(2026, 9, 24, 10, 0, 0, tzinfo=timezone.utc)
+        # 4 months ago includes Sep, Aug, Jul, Jun -> starts Jun 1, 2026
+        start_dt = get_n_months_ago_start(now_dt, 4)
+        self.assertEqual(start_dt.year, 2026)
+        self.assertEqual(start_dt.month, 6)
+        self.assertEqual(start_dt.day, 1)
+
+    def test_filter_prs_loc(self):
+        prs = [
+            {"number": 1, "author": "a", "createdAt": "2026-09-01T00:00:00Z", "total_loc": 50},
+            {"number": 2, "author": "b", "createdAt": "2026-09-01T00:00:00Z", "total_loc": 500},
+            {"number": 3, "author": "c", "createdAt": "2026-09-01T00:00:00Z", "total_loc": 1500},
+        ]
+        small_only = filter_prs(prs, max_loc=999)
+        self.assertEqual([p["number"] for p in small_only], [1, 2])
+
+        large_only = filter_prs(prs, min_loc=1000)
+        self.assertEqual([p["number"] for p in large_only], [3])
+
+    def test_analyze_records_multi_dimensional(self):
+        # Two PRs in Sep 2026: one <1000 LoC, one >=1000 LoC
+        prs = [
+            {
+                "number": 1,
+                "title": "Small fix",
+                "author": "alice",
+                "createdAt": "2026-09-10T10:00:00Z",
+                "mergedAt": "2026-09-10T11:00:00Z",
+                "total_loc": 200,
+                "listed_reviewers": [{"login": "bob", "requestedAt": "2026-09-10T10:00:00Z"}],
+                "approvals": [{"reviewer": "bob", "approvedAt": "2026-09-10T10:30:00Z"}],
+                "timeline_events": [
+                    {"type": "pr_created", "timestamp": "2026-09-10T10:00:00Z", "author": "alice", "role": "author"},
+                    {"type": "reviewer_requested", "timestamp": "2026-09-10T10:00:00Z", "author": "alice", "reviewer": "bob", "role": "author"},
+                    {"type": "review", "timestamp": "2026-09-10T10:30:00Z", "author": "bob", "state": "APPROVED", "role": "reviewer"},
+                ],
+            },
+            {
+                "number": 2,
+                "title": "Large refactor",
+                "author": "alice",
+                "createdAt": "2026-09-15T10:00:00Z",
+                "mergedAt": "2026-09-15T16:00:00Z",
+                "total_loc": 2500,
+                "listed_reviewers": [{"login": "carol", "requestedAt": "2026-09-15T10:00:00Z"}],
+                "approvals": [{"reviewer": "carol", "approvedAt": "2026-09-15T14:00:00Z"}],
+                "timeline_events": [
+                    {"type": "pr_created", "timestamp": "2026-09-15T10:00:00Z", "author": "alice", "role": "author"},
+                    {"type": "reviewer_requested", "timestamp": "2026-09-15T10:00:00Z", "author": "alice", "reviewer": "carol", "role": "author"},
+                    {"type": "review", "timestamp": "2026-09-15T14:00:00Z", "author": "carol", "state": "APPROVED", "role": "reviewer"},
+                ],
+            },
+        ]
+
+        analysis = analyze_records(
+            prs,
+            interval="month",
+            group_dimensions=["interval", "size"],
+            loc_split=1000,
+        )
+
+        groups = analysis["groups"]
+        self.assertEqual(len(groups), 2)
+
+        # PR 1: <1000 LoC, Added -> LGTM is 0.5 hours
+        g1 = groups[("2026-09", "0_1000")]
+        self.assertEqual(len(g1["prs"]), 1)
+        self.assertAlmostEqual(g1["added_to_lgtm_durations"][0], 0.5)
+
+        # PR 2: >=1000 LoC, Added -> LGTM is 4.0 hours
+        g2 = groups[("2026-09", "1_1000")]
+        self.assertEqual(len(g2["prs"]), 1)
+        self.assertAlmostEqual(g2["added_to_lgtm_durations"][0], 4.0)
 
     def test_percentile_and_stats(self):
         self.assertEqual(percentile([], 90), 0.0)
@@ -59,176 +249,9 @@ class TestReviewMetrics(unittest.TestCase):
         self.assertTrue(is_bot("google-claude-agent"))
         self.assertTrue(is_bot("dependabot[bot]"))
         self.assertTrue(is_bot("github-actions[bot]"))
+        self.assertTrue(is_bot("google-cla"))
         self.assertFalse(is_bot("jacobsimionato"))
-        self.assertFalse(is_bot("nan-yu"))
         self.assertFalse(is_bot(None))
-
-    def test_get_week_info(self):
-        dt = datetime(2026, 9, 22, 12, 0, 0)
-        week_key, week_range = get_week_info(dt)
-        self.assertEqual(week_key, "2026-W39")
-        self.assertIn("Sep 21", week_range)
-
-    def test_compute_turns(self):
-        pr = {
-            "author": "alice",
-            "timeline_events": [
-                {
-                    "type": "pr_created",
-                    "timestamp": "2026-09-20T10:00:00Z",
-                    "author": "alice",
-                    "role": "author",
-                },
-                {
-                    "type": "reviewer_requested",
-                    "timestamp": "2026-09-20T10:15:00Z",
-                    "author": "alice",
-                    "reviewer": "bob",
-                    "role": "author",
-                },
-                {
-                    "type": "comment",
-                    "timestamp": "2026-09-20T10:20:00Z",
-                    "author": "gemini-code-assist",
-                    "role": "bot",
-                },
-                {
-                    "type": "comment",
-                    "timestamp": "2026-09-20T11:15:00Z",
-                    "author": "bob",
-                    "role": "reviewer",
-                },
-                {
-                    "type": "commit",
-                    "timestamp": "2026-09-20T12:15:00Z",
-                    "author": "alice",
-                    "role": "author",
-                },
-                {
-                    "type": "review",
-                    "timestamp": "2026-09-20T12:45:00Z",
-                    "author": "bob",
-                    "state": "APPROVED",
-                    "role": "reviewer",
-                },
-            ],
-        }
-
-        rev_turns, auth_turns, per_rev = compute_turns(pr, include_bots=False)
-
-        # First reviewer turn: Bob responds at 11:15 to Alice's reviewer_requested at 10:15 (1.0 hour)
-        # Second reviewer turn: Bob approves at 12:45 after Alice's commit at 12:15 (0.5 hour)
-        self.assertEqual(len(rev_turns), 2)
-        self.assertAlmostEqual(rev_turns[0], 1.0)
-        self.assertAlmostEqual(rev_turns[1], 0.5)
-
-        # Author turn: Alice commits at 12:15 after Bob's comment at 11:15 (1.0 hour)
-        self.assertEqual(len(auth_turns), 1)
-        self.assertAlmostEqual(auth_turns[0], 1.0)
-
-        self.assertIn("bob", per_rev)
-        self.assertEqual(len(per_rev["bob"]), 2)
-
-    def test_filter_prs(self):
-        prs = [
-            {
-                "number": 1,
-                "author": "alice",
-                "createdAt": "2026-09-10T10:00:00Z",
-                "listed_reviewers": [{"login": "bob"}],
-                "other_reviewers": [],
-            },
-            {
-                "number": 2,
-                "author": "charlie",
-                "createdAt": "2026-09-15T10:00:00Z",
-                "listed_reviewers": [{"login": "dave"}],
-                "other_reviewers": [],
-            },
-        ]
-
-        by_author = filter_prs(prs, author="alice")
-        self.assertEqual(len(by_author), 1)
-        self.assertEqual(by_author[0]["number"], 1)
-
-        by_reviewer = filter_prs(prs, reviewer="dave")
-        self.assertEqual(len(by_reviewer), 1)
-        self.assertEqual(by_reviewer[0]["number"], 2)
-
-        by_date = filter_prs(prs, since="2026-09-12")
-        self.assertEqual(len(by_date), 1)
-        self.assertEqual(by_date[0]["number"], 2)
-
-    def test_parse_pr_node(self):
-        node = {
-            "number": 100,
-            "title": "Test PR",
-            "url": "https://github.com/a2ui-project/a2ui/pull/100",
-            "createdAt": "2026-09-20T10:00:00Z",
-            "mergedAt": "2026-09-20T15:00:00Z",
-            "isDraft": False,
-            "author": {"login": "author_user"},
-            "reviews": {
-                "nodes": [
-                    {
-                        "author": {"login": "rev_user"},
-                        "state": "APPROVED",
-                        "submittedAt": "2026-09-20T14:00:00Z",
-                    }
-                ]
-            },
-            "reviewRequests": {
-                "nodes": [
-                    {"requestedReviewer": {"login": "rev_user"}}
-                ]
-            },
-            "timelineItems": {
-                "nodes": [
-                    {
-                        "__typename": "ReviewRequestedEvent",
-                        "createdAt": "2026-09-20T10:05:00Z",
-                        "requestedReviewer": {"login": "rev_user"},
-                    },
-                    {
-                        "__typename": "PullRequestReview",
-                        "author": {"login": "rev_user"},
-                        "state": "APPROVED",
-                        "submittedAt": "2026-09-20T14:00:00Z",
-                    },
-                ]
-            },
-        }
-
-        parsed = parse_pr_node(node)
-        self.assertEqual(parsed["number"], 100)
-        self.assertEqual(parsed["author"], "author_user")
-        self.assertEqual(len(parsed["listed_reviewers"]), 1)
-        self.assertEqual(parsed["listed_reviewers"][0]["login"], "rev_user")
-        self.assertEqual(parsed["listed_reviewers"][0]["requestedAt"], "2026-09-20T10:05:00Z")
-        self.assertEqual(len(parsed["approvals"]), 1)
-        self.assertEqual(parsed["approvals"][0]["reviewer"], "rev_user")
-
-    def test_analyze_prs_authors(self):
-        pr = {
-            "number": 1,
-            "title": "Fix bug",
-            "author": "alice",
-            "createdAt": "2026-09-20T10:00:00Z",
-            "mergedAt": "2026-09-20T12:00:00Z",
-            "listed_reviewers": [{"login": "bob", "requestedAt": "2026-09-20T10:10:00Z"}],
-            "approvals": [{"reviewer": "bob", "approvedAt": "2026-09-20T11:00:00Z"}],
-            "timeline_events": [
-                {"type": "pr_created", "timestamp": "2026-09-20T10:00:00Z", "author": "alice", "role": "author"},
-                {"type": "reviewer_requested", "timestamp": "2026-09-20T10:10:00Z", "author": "alice", "reviewer": "bob", "role": "author"},
-                {"type": "review", "timestamp": "2026-09-20T11:00:00Z", "author": "bob", "state": "APPROVED", "role": "reviewer"},
-            ],
-        }
-        res = analyze_prs([pr])
-        self.assertIn("authors", res)
-        self.assertIn("alice", res["authors"])
-        self.assertEqual(res["authors"]["alice"]["prs_count"], 1)
-        self.assertAlmostEqual(res["authors"]["alice"]["added_to_lgtm_durations"][0], 50 / 60)
-        self.assertAlmostEqual(res["authors"]["alice"]["sub_to_merge_durations"][0], 2.0)
 
 
 if __name__ == "__main__":

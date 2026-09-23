@@ -58,38 +58,36 @@ python3 scripts/pull_review_data.py --limit 10
 | `--limit` | None | Maximum number of PRs to pull |
 | `--output` | `scripts/data/raw_prs.json` | Output JSON file path (gitignored) |
 
-### Extracted Metadata per PR
-For each merged PR, the raw payload contains:
-- `number`, `title`, `url`, `author`, `createdAt` (submission time), `mergedAt`, `isDraft`
-- `listed_reviewers`: Users requested via `ReviewRequestedEvent` or active review requests, along with exact request timestamps.
-- `other_reviewers`: Users who reviewed or commented without formal assignment.
-- `reviews`: All review submissions with state (`APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`) and timestamp.
-- `approvals`: All reviewer LGTM events with exact approval timestamps.
-- `comments`: All issue and review thread comments with timestamps and authors.
-- `commits`: All code update commits with commit author and timestamps.
-- `timeline_events`: Chronologically ordered unified event timeline for calculating turn latencies.
+### Extracted Metadata
+The raw dataset (`scripts/data/raw_prs.json`) contains two normalized tables:
+- **`prs`**: PR-level attributes including `number`, `title`, `url`, `author`, `createdAt` (submission time), `mergedAt`, `additions`, `deletions`, `changed_files`, `total_loc`, `listed_reviewers`, `other_reviewers`, `reviews`, `approvals`, `comments`, `commits`, and unified `timeline_events`.
+- **`reviews`**: Reviewer-level latency records tracking each reviewer's time added to time LGTM, turns count, and whether they were formally requested.
 
 ---
 
-## Stage 2: Generating Metrics & Reports
+## Stage 2: Dimension-Agnostic Metrics & Reporting
 
-Run `scripts/generate_review_metrics.py` to analyze the pulled raw data. Because it operates on the local cache, you can run it repeatedly with different filters or flags in milliseconds.
+Run `scripts/generate_review_metrics.py` to analyze the pulled raw data across arbitrary dimensions (time intervals, PR complexity/LoC, or opt-in author/reviewer groupings).
 
 ```bash
-# Generate full report (Markdown + CSV)
-python3 scripts/generate_review_metrics.py
-
-# Print the report directly to terminal stdout
+# Default: Week-by-week cohort breakdown across all PRs
 python3 scripts/generate_review_metrics.py --stdout
 
-# Filter by reviewer across the cached data
-python3 scripts/generate_review_metrics.py --reviewer nan-yu --stdout
+# Month-by-month breakdown for the last 4 months
+python3 scripts/generate_review_metrics.py --interval month --months 4 --stdout
 
-# Filter by author across the cached data
-python3 scripts/generate_review_metrics.py --author polina-c --stdout
+# Breakdown by month split by LoC threshold (< 1000 LoC vs >= 1000 LoC)
+python3 scripts/generate_review_metrics.py --interval month --months 4 --loc-split 1000 --stdout
 
-# Include bot accounts in metrics (default is human-only)
-python3 scripts/generate_review_metrics.py --include-bots
+# Group by standard PR size tiers (<100 LoC, 100-500, 500-1000, 1000+)
+python3 scripts/generate_review_metrics.py --group-by size --stdout
+
+# Filter by PR size
+python3 scripts/generate_review_metrics.py --min-loc 500 --max-loc 1500 --stdout
+
+# Opt-in author or reviewer grouping
+python3 scripts/generate_review_metrics.py --group-by author --stdout
+python3 scripts/generate_review_metrics.py --group-by reviewer --stdout
 ```
 
 ### CLI Arguments for `generate_review_metrics.py`
@@ -97,26 +95,26 @@ python3 scripts/generate_review_metrics.py --include-bots
 | Flag | Default | Description |
 | :--- | :--- | :--- |
 | `--input` | `scripts/data/raw_prs.json` | Path to raw JSON data |
-| `--markdown` | `scripts/reports/review_report.md` | Path to output Markdown report |
-| `--csv-dir` | `scripts/reports` | Directory where CSV files are saved |
+| `--interval` | `week` | Time cohort grouping: `week` or `month` |
+| `--months` | None | Filter to the last N calendar months (e.g. `--months 4`) |
+| `--weeks` | None | Filter to the last N weeks |
+| `--loc-split` | None | Split PRs into binary size tiers around a threshold (e.g. `--loc-split 1000`) |
+| `--min-loc` | None | Filter PRs with total LoC >= min_loc |
+| `--max-loc` | None | Filter PRs with total LoC <= max_loc |
+| `--group-by` | `interval` | Comma-separated grouping dimensions: `interval`, `size`, `author`, `reviewer` |
 | `--author` | None | Filter analysis by PR author |
 | `--reviewer` | None | Filter analysis by reviewer |
 | `--since` | None | Filter PRs created on or after `YYYY-MM-DD` |
 | `--until` | None | Filter PRs created on or before `YYYY-MM-DD` |
 | `--include-bots` | `False` | Include bot accounts (`gemini-code-assist`, etc.) |
+| `--markdown` | `scripts/reports/review_report.md` | Path to output Markdown report |
+| `--csv-dir` | `scripts/reports` | Directory where CSV files are saved |
 | `--stdout` | `False` | Print Markdown report to stdout |
 
 ### Output Files (in `scripts/reports/` - gitignored)
-1. **`review_report.md`**: Formatted Github-Flavored Markdown report containing:
-   - Executive Summary with core percentiles.
-   - Week-by-Week table grouped by PR submission time.
-   - Individual Reviewer Performance table.
-   - Individual Author Performance table.
-   - Metric definitions and methodology.
-2. **`weekly_metrics.csv`**: Weekly aggregated metrics (P50, P90 for all metrics).
-3. **`reviewer_metrics.csv`**: Reviewer-level summary (LGTM counts, turnaround percentiles).
-4. **`author_metrics.csv`**: Author-level summary (PR counts, LGTM latency, author turnaround percentiles).
-5. **`pr_details.csv`**: Granular per-PR breakdown with timestamps and computed latencies.
+1. **`review_report.md`**: Formatted Github-Flavored Markdown report with Executive Summary and multi-dimensional Cohort Breakdown.
+2. **`metrics.csv`**: Aggregated metrics table across the requested dimensions.
+3. **`prs.csv`**: Granular per-PR breakdown with timestamps, LoC, and computed latencies.
 
 ---
 

@@ -57,6 +57,9 @@ query($searchQuery: String!, $cursor: String) {
         createdAt
         mergedAt
         isDraft
+        additions
+        deletions
+        changedFiles
         author {
           login
         }
@@ -189,6 +192,10 @@ def parse_pr_node(pr: dict[str, Any]) -> dict[str, Any]:
     created_at = pr["createdAt"]
     merged_at = pr.get("mergedAt")
     is_draft = pr.get("isDraft", False)
+    additions = pr.get("additions", 0) or 0
+    deletions = pr.get("deletions", 0) or 0
+    changed_files = pr.get("changedFiles", 0) or 0
+    total_loc = additions + deletions
 
     author_obj = pr.get("author")
     pr_author = author_obj.get("login") if author_obj else "ghost"
@@ -365,6 +372,10 @@ def parse_pr_node(pr: dict[str, Any]) -> dict[str, Any]:
         "createdAt": created_at,
         "mergedAt": merged_at,
         "isDraft": is_draft,
+        "additions": additions,
+        "deletions": deletions,
+        "changed_files": changed_files,
+        "total_loc": total_loc,
         "author": pr_author,
         "listed_reviewers": [
             {"login": k, "requestedAt": min(v) if v else None, "allRequests": v}
@@ -377,6 +388,66 @@ def parse_pr_node(pr: dict[str, Any]) -> dict[str, Any]:
         "commits": commits,
         "timeline_events": timeline_events,
     }
+
+
+def build_review_records(prs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build the normalized reviews table from parsed PRs."""
+    reviews_table: list[dict[str, Any]] = []
+    for pr in prs:
+        pr_number = pr["number"]
+        pr_title = pr.get("title", "")
+        pr_author = pr["author"]
+        created_at_str = pr["createdAt"]
+        created_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+        total_loc = pr.get("total_loc", 0)
+
+        # map reviewer -> requested_at
+        reviewer_req_map: dict[str, str] = {}
+        for lr in pr.get("listed_reviewers", []):
+            login = lr["login"]
+            req_at = lr.get("requestedAt")
+            if req_at:
+                reviewer_req_map[login] = req_at
+            else:
+                reviewer_req_map.setdefault(login, created_at_str)
+
+        # map reviewer -> lgtm_at
+        reviewer_lgtm_map: dict[str, str] = {}
+        for app in pr.get("approvals", []):
+            rev = app.get("reviewer")
+            app_at = app.get("approvedAt")
+            if rev and app_at:
+                if rev not in reviewer_lgtm_map or app_at < reviewer_lgtm_map[rev]:
+                    reviewer_lgtm_map[rev] = app_at
+
+        all_reviewers = set(reviewer_req_map.keys()) | set(reviewer_lgtm_map.keys())
+        for rev_name in sorted(all_reviewers):
+            if is_bot(rev_name) or rev_name == pr_author:
+                continue
+            req_ts = reviewer_req_map.get(rev_name)
+            lgtm_ts = reviewer_lgtm_map.get(rev_name)
+
+            added_to_lgtm_hrs = None
+            if lgtm_ts:
+                baseline_dt = datetime.fromisoformat(req_ts.replace("Z", "+00:00")) if req_ts else created_dt
+                lgtm_dt = datetime.fromisoformat(lgtm_ts.replace("Z", "+00:00"))
+                added_to_lgtm_hrs = max(0.0, (lgtm_dt - baseline_dt).total_seconds() / 3600.0)
+
+            reviews_table.append({
+                "pr_number": pr_number,
+                "pr_title": pr_title,
+                "pr_author": pr_author,
+                "reviewer": rev_name,
+                "pr_created_at": created_at_str,
+                "pr_total_loc": total_loc,
+                "pr_additions": pr.get("additions", 0),
+                "pr_deletions": pr.get("deletions", 0),
+                "requested_at": req_ts,
+                "lgtm_at": lgtm_ts,
+                "added_to_lgtm_hrs": round(added_to_lgtm_hrs, 2) if added_to_lgtm_hrs is not None else None,
+                "was_formally_requested": rev_name in reviewer_req_map,
+            })
+    return reviews_table
 
 
 def pull_prs(
@@ -503,6 +574,8 @@ def main() -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    reviews_table = build_review_records(prs)
+
     output_payload = {
         "metadata": {
             "repository": args.repo,
@@ -516,8 +589,10 @@ def main() -> None:
                 "limit": args.limit,
             },
             "total_prs": len(prs),
+            "total_reviews": len(reviews_table),
         },
         "prs": prs,
+        "reviews": reviews_table,
     }
 
     with open(output_path, "w", encoding="utf-8") as f:
