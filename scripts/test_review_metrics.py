@@ -208,6 +208,28 @@ class TestReviewMetrics(unittest.TestCase):
         self.assertEqual(len(parsed["approvals"]), 1)
         self.assertEqual(parsed["approvals"][0]["reviewer"], "rev_user")
 
+    def test_analyze_prs_authors(self):
+        pr = {
+            "number": 1,
+            "title": "Fix bug",
+            "author": "alice",
+            "createdAt": "2026-09-20T10:00:00Z",
+            "mergedAt": "2026-09-20T12:00:00Z",
+            "listed_reviewers": [{"login": "bob", "requestedAt": "2026-09-20T10:10:00Z"}],
+            "approvals": [{"reviewer": "bob", "approvedAt": "2026-09-20T11:00:00Z"}],
+            "timeline_events": [
+                {"type": "pr_created", "timestamp": "2026-09-20T10:00:00Z", "author": "alice", "role": "author"},
+                {"type": "reviewer_requested", "timestamp": "2026-09-20T10:10:00Z", "author": "alice", "reviewer": "bob", "role": "author"},
+                {"type": "review", "timestamp": "2026-09-20T11:00:00Z", "author": "bob", "state": "APPROVED", "role": "reviewer"},
+            ],
+        }
+        res = analyze_prs([pr])
+        self.assertIn("authors", res)
+        self.assertIn("alice", res["authors"])
+        self.assertEqual(res["authors"]["alice"]["prs_count"], 1)
+        self.assertAlmostEqual(res["authors"]["alice"]["added_to_lgtm_durations"][0], 50 / 60)
+        self.assertAlmostEqual(res["authors"]["alice"]["sub_to_merge_durations"][0], 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -111,10 +111,12 @@ python3 scripts/generate_review_metrics.py --include-bots
    - Executive Summary with core percentiles.
    - Week-by-Week table grouped by PR submission time.
    - Individual Reviewer Performance table.
+   - Individual Author Performance table.
    - Metric definitions and methodology.
 2. **`weekly_metrics.csv`**: Weekly aggregated metrics (P50, P90 for all metrics).
 3. **`reviewer_metrics.csv`**: Reviewer-level summary (LGTM counts, turnaround percentiles).
-4. **`pr_details.csv`**: Granular per-PR breakdown with timestamps and computed latencies.
+4. **`author_metrics.csv`**: Author-level summary (PR counts, LGTM latency, author turnaround percentiles).
+5. **`pr_details.csv`**: Granular per-PR breakdown with timestamps and computed latencies.
 
 ---
 

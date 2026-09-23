@@ -196,6 +196,7 @@ def analyze_prs(
     """Perform full metrics aggregation across weeks and reviewers."""
     weekly_groups: dict[str, dict[str, Any]] = {}
     reviewer_aggregates: dict[str, dict[str, list[float]]] = {}
+    author_aggregates: dict[str, dict[str, Any]] = {}
     pr_details: list[dict[str, Any]] = []
 
     for pr in prs:
@@ -224,6 +225,18 @@ def analyze_prs(
         week = weekly_groups[week_key]
         week["prs"].append(pr)
 
+        auth_entry = author_aggregates.setdefault(
+            pr_author,
+            {
+                "prs_count": 0,
+                "sub_to_first_rev_durations": [],
+                "added_to_lgtm_durations": [],
+                "sub_to_merge_durations": [],
+                "author_turn_durations": [],
+            },
+        )
+        auth_entry["prs_count"] += 1
+
         # 1. PR submission to first reviewer added
         listed = pr.get("listed_reviewers", [])
         requested_times: list[datetime] = []
@@ -249,6 +262,7 @@ def analyze_prs(
                 0.0, (first_reviewer_req_dt - created_dt).total_seconds() / 3600.0
             )
             week["sub_to_first_reviewer_durations"].append(sub_to_first_reviewer_hrs)
+            auth_entry["sub_to_first_rev_durations"].append(sub_to_first_reviewer_hrs)
 
         # 2. Time from adding reviewer to LGTM
         approvals = pr.get("approvals", [])
@@ -284,16 +298,21 @@ def analyze_prs(
             )["lgtm_durations"].append(lgtm_hrs)
             pr_lgtm_durations.append(lgtm_hrs)
 
+        if pr_lgtm_durations:
+            auth_entry["added_to_lgtm_durations"].append(min(pr_lgtm_durations))
+
         # 3. Total PR Lifespan (Submission -> Merge)
         sub_to_merge_hrs: float | None = None
         if merged_dt:
             sub_to_merge_hrs = max(0.0, (merged_dt - created_dt).total_seconds() / 3600.0)
             week["sub_to_merge_durations"].append(sub_to_merge_hrs)
+            auth_entry["sub_to_merge_durations"].append(sub_to_merge_hrs)
 
         # 4. Turn latencies
         rev_turns, auth_turns, per_rev_turns = compute_turns(pr, include_bots=include_bots)
         week["reviewer_turn_durations"].extend(rev_turns)
         week["author_turn_durations"].extend(auth_turns)
+        auth_entry["author_turn_durations"].extend(auth_turns)
 
         for rev_name, r_turns in per_rev_turns.items():
             reviewer_aggregates.setdefault(
@@ -319,6 +338,7 @@ def analyze_prs(
     return {
         "weekly": weekly_groups,
         "reviewers": reviewer_aggregates,
+        "authors": author_aggregates,
         "pr_details": pr_details,
     }
 
@@ -444,10 +464,48 @@ def generate_markdown_report(
 
     lines.append("\n---\n")
 
+    lines.append("## Individual Author Performance\n")
+    lines.append(
+        "Metrics for pull request authors across the entire analysis window:\n"
+    )
+    lines.append(
+        "| Author | Merged PRs | Median Added &rarr; LGTM | P90 Added &rarr; LGTM | Median Sub &rarr; Rev Added | Median Sub &rarr; Merge | Author Turns | Median Turn Time | P90 Turn Time |"
+    )
+    lines.append(
+        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+    )
+
+    authors = analysis.get("authors", {})
+    sorted_authors = sorted(
+        authors.items(),
+        key=lambda item: item[1]["prs_count"],
+        reverse=True,
+    )
+
+    for auth_name, auth_data in sorted_authors:
+        st_lgtm = calc_stats(auth_data["added_to_lgtm_durations"])
+        st_sub_rev = calc_stats(auth_data["sub_to_first_rev_durations"])
+        st_merge = calc_stats(auth_data["sub_to_merge_durations"])
+        st_turn = calc_stats(auth_data["author_turn_durations"])
+
+        med_lgtm = format_duration(float(st_lgtm["median"])) if st_lgtm["count"] else "-"
+        p90_lgtm = format_duration(float(st_lgtm["p90"])) if st_lgtm["count"] else "-"
+        med_sub_rev = format_duration(float(st_sub_rev["median"])) if st_sub_rev["count"] else "-"
+        med_merge = format_duration(float(st_merge["median"])) if st_merge["count"] else "-"
+        med_turn = format_duration(float(st_turn["median"])) if st_turn["count"] else "-"
+        p90_turn = format_duration(float(st_turn["p90"])) if st_turn["count"] else "-"
+
+        lines.append(
+            f"| **`@{auth_name}`** | {auth_data['prs_count']} | {med_lgtm} | {p90_lgtm} | {med_sub_rev} | {med_merge} | {st_turn['count']} | {med_turn} | {p90_turn} |"
+        )
+
+    lines.append("\n---\n")
+
     lines.append("## Metric Definitions\n")
     lines.append("- **Added &rarr; LGTM**: Elapsed time between when a reviewer is requested (`ReviewRequestedEvent`) and when they submit an `APPROVED` review. (If not explicitly requested beforehand, uses PR submission time).")
     lines.append("- **Submission &rarr; Reviewer Added**: Elapsed time between PR creation (`createdAt`) and the timestamp the first reviewer was assigned.")
     lines.append("- **Reviewer Turn Time**: Latency between an author action (PR opened, reviewer requested, author pushed commit, or author replied) and a reviewer action (submitting review or posting a comment). This is the key metric reflecting reviewer responsiveness.")
+    lines.append("- **Author Turn Time**: Latency between a reviewer action (requesting changes or asking questions) and the author's response (new commit or reply).")
     lines.append("- **PR Lifespan**: Total duration from PR creation to merge.")
     lines.append("- **Bot Filtering**: Automated accounts (e.g. `gemini-code-assist`, `github-actions[bot]`) are excluded by default to avoid skewing human review times.")
 
@@ -455,10 +513,11 @@ def generate_markdown_report(
 
 
 def export_csv_reports(analysis: dict[str, Any], output_dir: Path) -> None:
-    """Export weekly metrics, reviewer metrics, and detailed PR rows to CSV."""
+    """Export weekly metrics, reviewer metrics, author metrics, and detailed PR rows to CSV."""
     output_dir.mkdir(parents=True, exist_ok=True)
     weekly = analysis["weekly"]
     reviewers = analysis["reviewers"]
+    authors = analysis.get("authors", {})
     pr_details = analysis["pr_details"]
 
     # 1. Weekly CSV
@@ -524,7 +583,45 @@ def export_csv_reports(analysis: dict[str, Any], output_dir: Path) -> None:
                 turn_st["p90"],
             ])
 
-    # 3. Detailed PRs CSV
+    # 3. Author CSV
+    author_csv_path = output_dir / "author_metrics.csv"
+    with open(author_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "author",
+            "merged_prs_count",
+            "added_to_lgtm_median_hours",
+            "added_to_lgtm_p90_hours",
+            "sub_to_first_rev_median_hours",
+            "sub_to_first_rev_p90_hours",
+            "sub_to_merge_median_hours",
+            "sub_to_merge_p90_hours",
+            "author_turns_count",
+            "author_turn_median_hours",
+            "author_turn_p90_hours",
+        ])
+        for auth_name, auth_data in sorted(
+            authors.items(), key=lambda item: item[1]["prs_count"], reverse=True
+        ):
+            st_lgtm = calc_stats(auth_data["added_to_lgtm_durations"])
+            st_sub_rev = calc_stats(auth_data["sub_to_first_rev_durations"])
+            st_merge = calc_stats(auth_data["sub_to_merge_durations"])
+            st_turn = calc_stats(auth_data["author_turn_durations"])
+            writer.writerow([
+                auth_name,
+                auth_data["prs_count"],
+                st_lgtm["median"],
+                st_lgtm["p90"],
+                st_sub_rev["median"],
+                st_sub_rev["p90"],
+                st_merge["median"],
+                st_merge["p90"],
+                st_turn["count"],
+                st_turn["median"],
+                st_turn["p90"],
+            ])
+
+    # 4. Detailed PRs CSV
     pr_csv_path = output_dir / "pr_details.csv"
     with open(pr_csv_path, "w", newline="", encoding="utf-8") as f:
         fieldnames = [
