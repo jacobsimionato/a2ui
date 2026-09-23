@@ -32,6 +32,10 @@ import statistics
 import sys
 from typing import Any
 
+from zoneinfo import ZoneInfo
+
+PST_TZ = ZoneInfo("America/Los_Angeles")
+
 DEFAULT_BOTS = {
     "gemini-code-assist",
     "google-claude-agent",
@@ -59,6 +63,29 @@ def parse_iso(ts_str: str) -> datetime:
     """Parse ISO-8601 timestamp string into datetime."""
     clean_str = ts_str.replace("Z", "+00:00")
     return datetime.fromisoformat(clean_str)
+
+
+def business_duration_hours(start_dt: datetime, end_dt: datetime, tz: ZoneInfo = PST_TZ) -> float:
+    """Calculate elapsed business hours excluding weekends (Sat/Sun) in PST."""
+    if end_dt <= start_dt:
+        return 0.0
+    start_local = start_dt.astimezone(tz)
+    end_local = end_dt.astimezone(tz)
+
+    current = start_local
+    total_seconds = 0.0
+
+    while current < end_local:
+        next_day = (current + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        chunk_end = min(next_day, end_local)
+
+        # Monday=0 ... Friday=4 in PST (weekdays)
+        if current.weekday() < 5:
+            total_seconds += (chunk_end - current).total_seconds()
+
+        current = chunk_end
+
+    return total_seconds / 3600.0
 
 
 def percentile(values: list[float], p: float) -> float:
@@ -92,21 +119,26 @@ def calc_stats(values: list[float]) -> dict[str, float | int]:
     }
 
 
-def format_duration(hours: float) -> str:
-    """Format duration in hours into a readable string (e.g., 25m, 3h 12m, 2d 4h)."""
+def format_business_duration(hours: float) -> str:
+    """Format duration in business days and hours/mins in PST."""
     if hours == 0.0:
-        return "0m"
+        return "0.00 bdays (0m)"
+
+    bdays = hours / 24.0
+
     if hours < 1.0:
         mins = max(1, int(round(hours * 60)))
-        return f"{mins}m"
+        time_str = f"{mins}m"
     elif hours < 24.0:
         hrs = int(hours)
         mins = int(round((hours - hrs) * 60))
-        return f"{hrs}h {mins}m" if mins > 0 else f"{hrs}h"
+        time_str = f"{hrs}h {mins}m" if mins > 0 else f"{hrs}h"
     else:
-        days = int(hours // 24)
+        d = int(hours // 24)
         rem_hrs = int(round(hours % 24))
-        return f"{days}d {rem_hrs}h" if rem_hrs > 0 else f"{days}d"
+        time_str = f"{d}d {rem_hrs}h" if rem_hrs > 0 else f"{d}d"
+
+    return f"{bdays:.2f} bdays ({time_str})"
 
 
 def get_interval_info(dt: datetime, interval_type: str = "week") -> tuple[str, str]:
@@ -175,7 +207,7 @@ def compute_turns(
             else:
                 if ev_author == pr_author or ev.get("role") in ("author", "contributor"):
                     if active_ball == "author" and last_reviewer_action_time:
-                        duration = (ev_time - last_reviewer_action_time).total_seconds() / 3600.0
+                        duration = business_duration_hours(last_reviewer_action_time, ev_time)
                         if duration >= 0:
                             author_turns.append(duration)
                     last_author_action_time = ev_time
@@ -184,7 +216,7 @@ def compute_turns(
         elif ev_type in ("review", "comment"):
             if ev_author != pr_author and not is_bot(ev_author):
                 if active_ball == "reviewer" and last_author_action_time:
-                    duration = (ev_time - last_author_action_time).total_seconds() / 3600.0
+                    duration = business_duration_hours(last_author_action_time, ev_time)
                     if duration >= 0:
                         reviewer_turns.append(duration)
                         per_reviewer_turns.setdefault(ev_author, []).append(duration)
@@ -193,7 +225,7 @@ def compute_turns(
 
             elif ev_author == pr_author:
                 if active_ball == "author" and last_reviewer_action_time:
-                    duration = (ev_time - last_reviewer_action_time).total_seconds() / 3600.0
+                    duration = business_duration_hours(last_reviewer_action_time, ev_time)
                     if duration >= 0:
                         author_turns.append(duration)
                 last_author_action_time = ev_time
@@ -252,7 +284,7 @@ def analyze_records(
     loc_split: int | None = None,
     include_bots: bool = False,
 ) -> dict[str, Any]:
-    """Group and analyze PRs across requested dimensions."""
+    """Group and analyze PRs across requested dimensions using PST business days."""
     if not group_dimensions:
         group_dimensions = ["interval"]
 
@@ -292,7 +324,7 @@ def analyze_records(
 
         sub_to_first_rev_hrs: float | None = None
         if first_reviewer_req_dt:
-            sub_to_first_rev_hrs = max(0.0, (first_reviewer_req_dt - created_dt).total_seconds() / 3600.0)
+            sub_to_first_rev_hrs = business_duration_hours(created_dt, first_reviewer_req_dt)
 
         approvals = pr.get("approvals", [])
         seen_approvals: dict[str, datetime] = {}
@@ -305,14 +337,23 @@ def analyze_records(
                     seen_approvals[rev_name] = app_dt
 
         pr_lgtm_durations: list[float] = []
+        req_dts_for_approvers: list[datetime] = []
         for rev_name, app_dt in seen_approvals.items():
             req_dt = reviewer_first_requested.get(rev_name, created_dt)
-            lgtm_hrs = max(0.0, (app_dt - req_dt).total_seconds() / 3600.0)
+            req_dts_for_approvers.append(req_dt)
+            lgtm_hrs = business_duration_hours(req_dt, app_dt)
             pr_lgtm_durations.append(lgtm_hrs)
+
+        # PR level: time until ALL approving reviewers approved
+        pr_all_lgtm_hrs: float | None = None
+        if seen_approvals:
+            earliest_req = min(req_dts_for_approvers)
+            latest_app = max(seen_approvals.values())
+            pr_all_lgtm_hrs = business_duration_hours(earliest_req, latest_app)
 
         sub_to_merge_hrs: float | None = None
         if merged_dt:
-            sub_to_merge_hrs = max(0.0, (merged_dt - created_dt).total_seconds() / 3600.0)
+            sub_to_merge_hrs = business_duration_hours(created_dt, merged_dt)
 
         rev_turns, auth_turns, per_rev_turns = compute_turns(pr, include_bots=include_bots)
 
@@ -328,11 +369,11 @@ def analyze_records(
             "size_label": size_label,
             "sub_to_first_rev_hrs": round(sub_to_first_rev_hrs, 2) if sub_to_first_rev_hrs is not None else "",
             "min_added_to_lgtm_hrs": round(min(pr_lgtm_durations), 2) if pr_lgtm_durations else "",
+            "all_lgtm_hrs": round(pr_all_lgtm_hrs, 2) if pr_all_lgtm_hrs is not None else "",
             "sub_to_merge_hrs": round(sub_to_merge_hrs, 2) if sub_to_merge_hrs is not None else "",
             "approvers": ", ".join(sorted(seen_approvals.keys())),
         })
 
-        # Form group keys: if grouping includes reviewer, explode by reviewer
         if "reviewer" in group_dimensions:
             reviewers_to_evaluate = sorted(seen_approvals.keys()) or list(reviewer_first_requested.keys())
             if not reviewers_to_evaluate:
@@ -363,6 +404,7 @@ def analyze_records(
                     "key": full_key,
                     "labels": labels,
                     "prs": [],
+                    "all_lgtm_durations": [],
                     "added_to_lgtm_durations": [],
                     "reviewer_turn_durations": [],
                     "sub_to_first_rev_durations": [],
@@ -372,9 +414,12 @@ def analyze_records(
             g = groups[full_key]
             g["prs"].append(pr)
 
+            if pr_all_lgtm_hrs is not None:
+                g["all_lgtm_durations"].append(pr_all_lgtm_hrs)
+
             if current_reviewer and current_reviewer in seen_approvals:
                 req_dt = reviewer_first_requested.get(current_reviewer, created_dt)
-                lgtm_hrs = max(0.0, (seen_approvals[current_reviewer] - req_dt).total_seconds() / 3600.0)
+                lgtm_hrs = business_duration_hours(req_dt, seen_approvals[current_reviewer])
                 g["added_to_lgtm_durations"].append(lgtm_hrs)
             elif not current_reviewer:
                 g["added_to_lgtm_durations"].extend(pr_lgtm_durations)
@@ -400,24 +445,27 @@ def analyze_records(
 def generate_markdown_report(
     analysis: dict[str, Any], metadata: dict[str, Any]
 ) -> str:
-    """Format analysis into a clean, Github-Flavored Markdown report."""
+    """Format analysis into a clean, Github-Flavored Markdown report in PST business days."""
     groups = analysis["groups"]
     dims = analysis["dimensions"]
     pr_rows = analysis["pr_rows"]
 
     total_prs = len(pr_rows)
-    all_lgtm = []
+    all_pr_lgtm = []
+    all_indiv_lgtm = []
     all_rev_turns = []
     all_sub_rev = []
     all_merge = []
 
     for g in groups.values():
-        all_lgtm.extend(g["added_to_lgtm_durations"])
+        all_pr_lgtm.extend(g["all_lgtm_durations"])
+        all_indiv_lgtm.extend(g["added_to_lgtm_durations"])
         all_rev_turns.extend(g["reviewer_turn_durations"])
         all_sub_rev.extend(g["sub_to_first_rev_durations"])
         all_merge.extend(g["sub_to_merge_durations"])
 
-    st_lgtm_all = calc_stats(all_lgtm)
+    st_all_lgtm = calc_stats(all_pr_lgtm)
+    st_indiv_lgtm = calc_stats(all_indiv_lgtm)
     st_turn_all = calc_stats(all_rev_turns)
     st_sub_rev_all = calc_stats(all_sub_rev)
     st_merge_all = calc_stats(all_merge)
@@ -426,6 +474,7 @@ def generate_markdown_report(
     lines.append("# A2UI Code Review Performance Report\n")
     lines.append(f"> **Repository:** `{metadata.get('repository', 'a2ui-project/a2ui')}`  ")
     lines.append(f"> **Timeframe:** {metadata.get('filters', {}).get('since', 'All')} to {metadata.get('filters', {}).get('until', 'All')}  ")
+    lines.append(f"> **Measurement:** **Business Days in US/Pacific (PST/PDT)** *(weekends excluded)*  ")
     lines.append(f"> **Grouped by:** {', '.join(dims)}  ")
     lines.append(f"> **Merged PRs Analyzed:** {total_prs}\n")
 
@@ -433,16 +482,19 @@ def generate_markdown_report(
     lines.append("| Metric | Median | 90th Percentile (P90) | Sample Count |")
     lines.append("| :--- | :---: | :---: | :---: |")
     lines.append(
-        f"| **Reviewer Added &rarr; LGTM** | **{format_duration(float(st_lgtm_all['median']))}** ({st_lgtm_all['median']}h) | **{format_duration(float(st_lgtm_all['p90']))}** ({st_lgtm_all['p90']}h) | {st_lgtm_all['count']} approvals |"
+        f"| **Review Time: Reviewers Added &rarr; All LGTMs** | **{format_business_duration(float(st_all_lgtm['median']))}** | **{format_business_duration(float(st_all_lgtm['p90']))}** | {st_all_lgtm['count']} PRs with approvals |"
     )
     lines.append(
-        f"| **Reviewer Turn Time** (Author Action &rarr; Reviewer Response) | **{format_duration(float(st_turn_all['median']))}** ({st_turn_all['median']}h) | **{format_duration(float(st_turn_all['p90']))}** ({st_turn_all['p90']}h) | {st_turn_all['count']} turns |"
+        f"| **Individual Reviewer: Added &rarr; LGTM** | **{format_business_duration(float(st_indiv_lgtm['median']))}** | **{format_business_duration(float(st_indiv_lgtm['p90']))}** | {st_indiv_lgtm['count']} approvals |"
     )
     lines.append(
-        f"| **Submission &rarr; First Reviewer Added** | **{format_duration(float(st_sub_rev_all['median']))}** ({st_sub_rev_all['median']}h) | **{format_duration(float(st_sub_rev_all['p90']))}** ({st_sub_rev_all['p90']}h) | {st_sub_rev_all['count']} PRs |"
+        f"| **Reviewer Turn Time** (Author Action &rarr; Reviewer Response) | **{format_business_duration(float(st_turn_all['median']))}** | **{format_business_duration(float(st_turn_all['p90']))}** | {st_turn_all['count']} turns |"
     )
     lines.append(
-        f"| **PR Lifespan** (Submission &rarr; Merge) | **{format_duration(float(st_merge_all['median']))}** ({st_merge_all['median']}h) | **{format_duration(float(st_merge_all['p90']))}** ({st_merge_all['p90']}h) | {st_merge_all['count']} PRs |"
+        f"| **Submission &rarr; First Reviewer Added** | **{format_business_duration(float(st_sub_rev_all['median']))}** | **{format_business_duration(float(st_sub_rev_all['p90']))}** | {st_sub_rev_all['count']} PRs |"
+    )
+    lines.append(
+        f"| **PR Lifespan** (Submission &rarr; Merge) | **{format_business_duration(float(st_merge_all['median']))}** | **{format_business_duration(float(st_merge_all['p90']))}** | {st_merge_all['count']} PRs |"
     )
     lines.append("\n---\n")
 
@@ -460,10 +512,10 @@ def generate_markdown_report(
 
     headers.extend([
         "Merged PRs",
-        "Added → LGTM (Median)",
-        "Added → LGTM (P90)",
+        "Review Time: All LGTMs (Median)",
+        "Review Time: All LGTMs (P90)",
+        "Indiv. LGTM (Median)",
         "Reviewer Turn (Median)",
-        "Sub → Rev Added (Median)",
         "Sub → Merge (Median)",
     ])
 
@@ -474,9 +526,9 @@ def generate_markdown_report(
 
     for k in sorted_keys:
         g = groups[k]
-        st_lgtm = calc_stats(g["added_to_lgtm_durations"])
+        st_all_g = calc_stats(g["all_lgtm_durations"])
+        st_ind_g = calc_stats(g["added_to_lgtm_durations"])
         st_turns = calc_stats(g["reviewer_turn_durations"])
-        st_sub_rev = calc_stats(g["sub_to_first_rev_durations"])
         st_merge = calc_stats(g["sub_to_merge_durations"])
 
         row = []
@@ -490,11 +542,11 @@ def generate_markdown_report(
             row.append(f"{g['labels']['reviewer']}")
 
         row.append(str(len(g["prs"])))
-        row.append(format_duration(float(st_lgtm["median"])) if st_lgtm["count"] else "-")
-        row.append(format_duration(float(st_lgtm["p90"])) if st_lgtm["count"] else "-")
-        row.append(format_duration(float(st_turns["median"])) if st_turns["count"] else "-")
-        row.append(format_duration(float(st_sub_rev["median"])) if st_sub_rev["count"] else "-")
-        row.append(format_duration(float(st_merge["median"])) if st_merge["count"] else "-")
+        row.append(format_business_duration(float(st_all_g["median"])) if st_all_g["count"] else "-")
+        row.append(format_business_duration(float(st_all_g["p90"])) if st_all_g["count"] else "-")
+        row.append(format_business_duration(float(st_ind_g["median"])) if st_ind_g["count"] else "-")
+        row.append(format_business_duration(float(st_turns["median"])) if st_turns["count"] else "-")
+        row.append(format_business_duration(float(st_merge["median"])) if st_merge["count"] else "-")
 
         lines.append("| " + " | ".join(row) + " |")
 
@@ -521,34 +573,42 @@ def export_csv_reports(analysis: dict[str, Any], output_dir: Path) -> None:
         writer = csv.writer(f)
         header = list(dims) + [
             "merged_prs_count",
-            "added_to_lgtm_median_hours",
-            "added_to_lgtm_p90_hours",
-            "reviewer_turn_median_hours",
-            "reviewer_turn_p90_hours",
-            "sub_to_first_rev_median_hours",
-            "sub_to_first_rev_p90_hours",
-            "sub_to_merge_median_hours",
-            "sub_to_merge_p90_hours",
+            "review_time_all_lgtm_median_bdays",
+            "review_time_all_lgtm_p90_bdays",
+            "indiv_lgtm_median_bdays",
+            "indiv_lgtm_p90_bdays",
+            "reviewer_turn_median_bdays",
+            "reviewer_turn_p90_bdays",
+            "sub_to_merge_median_bdays",
+            "sub_to_merge_p90_bdays",
+            "review_time_all_lgtm_median_hours",
+            "review_time_all_lgtm_p90_hours",
+            "indiv_lgtm_median_hours",
+            "indiv_lgtm_p90_hours",
         ]
         writer.writerow(header)
         for k in sorted(groups.keys()):
             g = groups[k]
-            st_lgtm = calc_stats(g["added_to_lgtm_durations"])
+            st_all_lgtm = calc_stats(g["all_lgtm_durations"])
+            st_indiv_lgtm = calc_stats(g["added_to_lgtm_durations"])
             st_turns = calc_stats(g["reviewer_turn_durations"])
-            st_sub_rev = calc_stats(g["sub_to_first_rev_durations"])
             st_merge = calc_stats(g["sub_to_merge_durations"])
 
             dim_vals = [g["labels"].get(d, str(k[i])) for i, d in enumerate(dims)]
             writer.writerow(dim_vals + [
                 len(g["prs"]),
-                st_lgtm["median"],
-                st_lgtm["p90"],
-                st_turns["median"],
-                st_turns["p90"],
-                st_sub_rev["median"],
-                st_sub_rev["p90"],
-                st_merge["median"],
-                st_merge["p90"],
+                round(float(st_all_lgtm["median"]) / 24.0, 2) if st_all_lgtm["count"] else "",
+                round(float(st_all_lgtm["p90"]) / 24.0, 2) if st_all_lgtm["count"] else "",
+                round(float(st_indiv_lgtm["median"]) / 24.0, 2) if st_indiv_lgtm["count"] else "",
+                round(float(st_indiv_lgtm["p90"]) / 24.0, 2) if st_indiv_lgtm["count"] else "",
+                round(float(st_turns["median"]) / 24.0, 2) if st_turns["count"] else "",
+                round(float(st_turns["p90"]) / 24.0, 2) if st_turns["count"] else "",
+                round(float(st_merge["median"]) / 24.0, 2) if st_merge["count"] else "",
+                round(float(st_merge["p90"]) / 24.0, 2) if st_merge["count"] else "",
+                st_all_lgtm["median"],
+                st_all_lgtm["p90"],
+                st_indiv_lgtm["median"],
+                st_indiv_lgtm["p90"],
             ])
 
     pr_csv_path = output_dir / "prs.csv"

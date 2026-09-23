@@ -17,14 +17,16 @@
 
 from datetime import datetime, timezone
 import unittest
+from zoneinfo import ZoneInfo
 
 from scripts.generate_review_metrics import (
     analyze_records,
+    business_duration_hours,
     calc_stats,
     classify_size,
     compute_turns,
     filter_prs,
-    format_duration,
+    format_business_duration,
     get_interval_info,
     get_n_months_ago_start,
     is_bot,
@@ -236,13 +238,26 @@ class TestReviewPipeline(unittest.TestCase):
         self.assertEqual(stats["median"], 5.5)
         self.assertEqual(stats["p90"], 9.1)
 
-    def test_format_duration(self):
-        self.assertEqual(format_duration(0.0), "0m")
-        self.assertEqual(format_duration(0.25), "15m")
-        self.assertEqual(format_duration(1.0), "1h")
-        self.assertEqual(format_duration(2.5), "2h 30m")
-        self.assertEqual(format_duration(25.0), "1d 1h")
-        self.assertEqual(format_duration(48.0), "2d")
+    def test_business_duration_hours_weekend_exclusion(self):
+        # Friday Sep 18, 2026 17:00 PST to Monday Sep 21, 2026 09:00 PST
+        # Friday 17:00 to Friday 24:00 is 7 hours.
+        # Saturday and Sunday: 0 hours (weekend in PST).
+        # Monday 00:00 to Monday 09:00 is 9 hours.
+        # Total business hours = 7 + 9 = 16.0 hours (0.67 business days)
+        # Wall-clock hours would be 64.0 hours!
+        pst = ZoneInfo("America/Los_Angeles")
+        fri_5pm = datetime(2026, 9, 18, 17, 0, 0, tzinfo=pst)
+        mon_9am = datetime(2026, 9, 21, 9, 0, 0, tzinfo=pst)
+
+        biz_hrs = business_duration_hours(fri_5pm, mon_9am)
+        self.assertAlmostEqual(biz_hrs, 16.0)
+
+    def test_format_business_duration(self):
+        self.assertEqual(format_business_duration(0.0), "0.00 bdays (0m)")
+        self.assertEqual(format_business_duration(0.25), "0.01 bdays (15m)")
+        self.assertEqual(format_business_duration(12.0), "0.50 bdays (12h)")
+        self.assertEqual(format_business_duration(24.0), "1.00 bdays (1d)")
+        self.assertEqual(format_business_duration(36.0), "1.50 bdays (1d 12h)")
 
     def test_bot_detection(self):
         self.assertTrue(is_bot("gemini-code-assist"))
