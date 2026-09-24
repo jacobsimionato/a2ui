@@ -200,11 +200,11 @@ describe('MessageProcessor', () => {
 
   describe('getRendererDataModel', () => {
     it('returns undefined when no surfaces have sendDataModel enabled', () => {
-      const model = processor.getRendererDataModel('v0.9');
+      const model = processor.getRendererDataModel();
       assert.strictEqual(model, undefined);
     });
 
-    it('returns data model payload for surfaces with sendDataModel enabled', () => {
+    it('returns data model payload and auto-infers version from surface catalog', () => {
       const processor = new MessageProcessor<ComponentApi>([
         new Catalog('test-catalog', '1.0', []),
       ]);
@@ -218,10 +218,68 @@ describe('MessageProcessor', () => {
         },
       });
 
-      const model = processor.getRendererDataModel('v1.0');
-      assert.ok(model);
-      assert.strictEqual(model.version, 'v1.0');
-      assert.strictEqual((model as any).surfaces.s1.user.name, 'Alice');
+      // Auto-inferred
+      const autoModel = processor.getRendererDataModel();
+      assert.ok(autoModel);
+      assert.strictEqual(autoModel.version, 'v1.0');
+      assert.strictEqual((autoModel as any).surfaces.s1.user.name, 'Alice');
+
+      // Explicit target version
+      const explicitModel = processor.getRendererDataModel('v1.0');
+      assert.ok(explicitModel);
+      assert.strictEqual(explicitModel.version, 'v1.0');
+      assert.strictEqual((explicitModel as any).surfaces.s1.user.name, 'Alice');
+    });
+
+    it('throws when multiple protocol versions are present without explicit version', () => {
+      const catV09 = new Catalog('cat-09', '0.9', []);
+      const catV10 = new Catalog('cat-10', '1.0', []);
+      const multiProc = new MessageProcessor<ComponentApi>([catV09, catV10]);
+
+      multiProc.processMessages([
+        {
+          version: 'v0.9',
+          createSurface: {
+            surfaceId: 's09',
+            catalogId: 'cat-09',
+            sendDataModel: true,
+          },
+        },
+        {
+          version: 'v0.9',
+          updateDataModel: {
+            surfaceId: 's09',
+            value: {val: 'from-09'},
+          },
+        },
+      ]);
+      multiProc.processMessages([
+        {
+          version: 'v1.0',
+          createSurface: {
+            surfaceId: 's10',
+            catalogId: 'cat-10',
+            sendDataModel: true,
+            dataModel: {val: 'from-10'},
+          },
+        },
+      ]);
+
+      assert.throws(
+        () => multiProc.getRendererDataModel(),
+        /Multiple protocol versions detected among active surfaces/,
+      );
+
+      // But specifying target version succeeds and filters:
+      const v09Model = multiProc.getRendererDataModel('v0.9');
+      assert.ok(v09Model);
+      assert.strictEqual(v09Model.version, 'v0.9');
+      assert.deepStrictEqual((v09Model as any).surfaces, {s09: {val: 'from-09'}});
+
+      const v10Model = multiProc.getRendererDataModel('v1.0');
+      assert.ok(v10Model);
+      assert.strictEqual(v10Model.version, 'v1.0');
+      assert.deepStrictEqual((v10Model as any).surfaces, {s10: {val: 'from-10'}});
     });
   });
 

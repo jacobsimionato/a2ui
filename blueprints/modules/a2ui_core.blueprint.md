@@ -483,7 +483,7 @@ class MessageProcessor<T extends ComponentApi> {
    * Returns the aggregated data model for all surfaces that have 'sendDataModel' enabled.
    * This should be used by the transport layer to populate metadata (e.g., 'A2uiRendererDataModel').
    */
-  getRendererDataModel(version: ProtocolVersion): A2uiRendererDataModel | undefined;
+  getRendererDataModel(version?: ProtocolVersion): A2uiRendererDataModel | undefined;
 
   /** Disposes the processor, its surfaces, and all pending outbound RPC requests. */
   dispose(reason?: string): void;
@@ -509,7 +509,9 @@ When a surface is created with `sendDataModel: true`, the renderer is responsibl
 **Implementation Flow:**
 
 1.  The `MessageProcessor` tracks the `sendDataModel` flag for each surface.
-2.  The `getRendererDataModel()` method iterates over all active surfaces and returns a map of data models for those where the flag is enabled.
+2.  The `getRendererDataModel(version?: ProtocolVersion)` method collects the data models of active surfaces where `sendDataModel` is enabled:
+    - If `version` is provided, it filters and returns only surfaces compatible with that protocol version.
+    - If `version` is omitted, it auto-infers the protocol version from the active surface(s). If active surfaces have conflicting protocol versions, it throws an `A2uiValidationError` requiring the caller to explicitly specify the target version.
 3.  The **Transport Layer** (e.g., A2A, MCP) calls `getRendererDataModel()` before sending any message to the agent.
 4.  If a non-empty data model map is returned, it is included in the transport's metadata field (e.g., `A2uiRendererDataModel` in A2A metadata).
 

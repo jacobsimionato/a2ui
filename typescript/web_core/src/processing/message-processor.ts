@@ -310,24 +310,65 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
   /**
    * Serializes active surface data models configured for client-to-agent reporting.
    *
-   * @param version Protocol version to embed in the payload envelope.
-   * @returns Serialized data model payload, or undefined if no surfaces stream data models.
+   * If version is provided, returns data models only for surfaces compatible with that version.
+   * If version is omitted:
+   *   - Automatically derives the protocol version from the active surface(s) with sendDataModel.
+   *   - If active surfaces have conflicting protocol versions, throws A2uiValidationError.
+   *
+   * @param version Optional target protocol version to filter surfaces.
+   * @returns Serialized data model payload, or undefined if no matching surfaces exist.
    */
-  getRendererDataModel(version: ProtocolVersion): Record<string, unknown> | undefined {
-    const surfaces: Record<string, unknown> = {};
-
-    for (const surface of this.model.surfacesMap.values()) {
-      if (surface.sendDataModel) {
-        surfaces[surface.id] = surface.dataModel.get('/');
-      }
-    }
-
-    if (Object.keys(surfaces).length === 0) {
+  getRendererDataModel(version?: ProtocolVersion): Record<string, unknown> | undefined {
+    const enabledSurfaces = Array.from(this.model.surfacesMap.values()).filter(
+      s => s.sendDataModel,
+    );
+    if (enabledSurfaces.length === 0) {
       return undefined;
     }
 
+    if (version !== undefined) {
+      const surfaces: Record<string, unknown> = {};
+      for (const surface of enabledSurfaces) {
+        const catVer = surface.defaultCatalog?.protocolVersion;
+        if (!catVer || isCatalogVersionCompatible(catVer, version)) {
+          surfaces[surface.id] = surface.dataModel.get('/');
+        }
+      }
+      if (Object.keys(surfaces).length === 0) {
+        return undefined;
+      }
+      return {
+        version,
+        surfaces,
+      };
+    }
+
+    const versionsSet = new Set<ProtocolVersion>();
+    for (const surface of enabledSurfaces) {
+      if (surface.defaultCatalog?.protocolVersion) {
+        const canonical = toCanonicalVersion(surface.defaultCatalog.protocolVersion);
+        const canonicalVer = (
+          canonical ? `v${canonical}` : surface.defaultCatalog.protocolVersion
+        ) as ProtocolVersion;
+        versionsSet.add(canonicalVer);
+      }
+    }
+
+    if (versionsSet.size > 1) {
+      throw new A2uiValidationError(
+        `Multiple protocol versions detected among active surfaces: ${Array.from(versionsSet).sort().join(', ')}. ` +
+          'Specify a target protocol version in getRendererDataModel(version).',
+      );
+    }
+
+    const verStr =
+      versionsSet.size === 1 ? (versionsSet.values().next().value as ProtocolVersion) : 'v1.0';
+    const surfaces: Record<string, unknown> = {};
+    for (const surface of enabledSurfaces) {
+      surfaces[surface.id] = surface.dataModel.get('/');
+    }
     return {
-      version,
+      version: verStr,
       surfaces,
     };
   }
@@ -336,10 +377,10 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
    * Aggregates active client/renderer data models.
    *
    * @deprecated Use `getRendererDataModel` instead.
-   * @param version Protocol version to format data models for.
-   * @returns Serialized data model payload, or undefined if no surfaces stream data models.
+   * @param version Optional target protocol version to format data models for.
+   * @returns Serialized data model payload, or undefined if no matching surfaces exist.
    */
-  getClientDataModel(version: ProtocolVersion): Record<string, unknown> | undefined {
+  getClientDataModel(version?: ProtocolVersion): Record<string, unknown> | undefined {
     return this.getRendererDataModel(version);
   }
 

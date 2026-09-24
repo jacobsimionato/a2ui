@@ -262,20 +262,60 @@ class MessageProcessor:
         return capabilities
 
     def get_renderer_data_model(
-        self, version: str | ProtocolVersion
+        self, version: str | ProtocolVersion | None = None
     ) -> dict[str, Any] | None:
-        """Aggregates active renderer data models for sync metadata."""
-        surfaces = {}
-        for surface in self.model.surfaces.values():
-            if surface.send_data_model:
-                surfaces[surface.id] = surface.data_model.get("/")
+        """Aggregates active renderer data models for sync metadata.
 
-        if not surfaces:
+        If version is provided, returns data models only for surfaces compatible with that version.
+        If version is omitted:
+          - Automatically derives the protocol version from the active surface(s) with send_data_model.
+          - If active surfaces have conflicting protocol versions, raises A2uiValidationError.
+
+        Args:
+            version: Optional target protocol version to filter surfaces.
+
+        Returns:
+            Renderer data model dictionary, or None if no matching surfaces exist.
+        """
+        enabled_surfaces = [
+            s for s in self.model.surfaces.values() if s.send_data_model
+        ]
+        if not enabled_surfaces:
             return None
 
-        ver_str = (
-            version.value if isinstance(version, ProtocolVersion) else str(version)
-        )
+        if version is not None:
+            ver_str = (
+                version.value if isinstance(version, ProtocolVersion) else str(version)
+            )
+            surfaces = {}
+            for surface in enabled_surfaces:
+                cat_ver = (
+                    surface.default_catalog.protocol_version
+                    if surface.default_catalog
+                    else None
+                )
+                if not cat_ver or is_catalog_version_compatible(cat_ver, ver_str):
+                    surfaces[surface.id] = surface.data_model.get("/")
+            if not surfaces:
+                return None
+            return {"version": ver_str, "surfaces": surfaces}
+
+        versions_set = {
+            s.default_catalog.protocol_version.value
+            if isinstance(s.default_catalog.protocol_version, ProtocolVersion)
+            else str(s.default_catalog.protocol_version)
+            for s in enabled_surfaces
+            if s.default_catalog and getattr(s.default_catalog, "protocol_version", None)
+        }
+
+        if len(versions_set) > 1:
+            raise A2uiValidationError(
+                f"Multiple protocol versions detected among active surfaces: {sorted(versions_set)}. "
+                "Specify a target protocol version in get_renderer_data_model(version)."
+            )
+
+        ver_str = next(iter(versions_set)) if versions_set else "v1.0"
+        surfaces = {s.id: s.data_model.get("/") for s in enabled_surfaces}
         return {"version": ver_str, "surfaces": surfaces}
 
     def process_operation(
