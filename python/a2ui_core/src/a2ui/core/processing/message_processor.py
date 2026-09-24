@@ -73,15 +73,10 @@ from .operations import (
     InternalUpdateDataModelOp,
 )
 
-from dataclasses import dataclass
-
 from ..rpc import CallOptions, OutboundListener, RpcHandler
+from ..resolution.data_context import DataContext
 
 PendingAgentCallCallback = Callable[[Any, Optional[dict[str, Any]]], None]
-
-
-from .execution_context import ExecutionContext
-from ..resolution.data_context import DataContext
 
 
 @dataclass
@@ -228,32 +223,22 @@ class MessageProcessor:
     def get_renderer_capabilities(
         self,
         options: CapabilitiesOptions | None = None,
-        *,
-        versions: Sequence[ProtocolVersion | str] | None = None,
-        include_inline_catalogs: bool = False,
     ) -> dict[str, Any]:
         """Generates renderer capabilities dictionary keyed by protocol version(s).
 
         Args:
             options: Configuration options for capability generation.
-            versions: (Optional legacy parameter) Sequence of protocol versions.
-            include_inline_catalogs: (Optional legacy parameter) Whether to include inline catalogs.
 
         Returns:
             Renderer capabilities dictionary.
         """
-        opts = options or CapabilitiesOptions(
-            versions=versions,
-            include_inline_catalogs=include_inline_catalogs,
-        )
+        opts = options or CapabilitiesOptions()
         effective_versions = (
             opts.versions
             if opts.versions is not None
-            else (versions if versions is not None else [ProtocolVersion.V0_9])
+            else [ProtocolVersion.V0_9]
         )
-        effective_include_inline = (
-            opts.include_inline_catalogs or include_inline_catalogs
-        )
+        effective_include_inline = opts.include_inline_catalogs
 
         capabilities: dict[str, Any] = {}
         for ver in effective_versions:

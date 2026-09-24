@@ -122,7 +122,7 @@ describe('MessageProcessor', () => {
       const proc = new MessageProcessor([cat], undefined, {version: 'v1.0'});
 
       const caps = proc.getRendererCapabilities({
-        version: 'v1.0',
+        versions: ['v1.0'],
         includeInlineCatalogs: true,
       });
 

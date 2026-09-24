@@ -291,11 +291,14 @@ def test_message_processor_data_model_updates(mock_catalog):
 def test_message_processor_get_renderer_capabilities_list_of_versions(
     mock_catalog,
 ):
+    from a2ui.core.processing import CapabilitiesOptions
     from a2ui.core.schema import ProtocolVersion
 
     processor = MessageProcessor(catalogs=[mock_catalog])
     caps = processor.get_renderer_capabilities(
-        versions=[ProtocolVersion.V0_8, ProtocolVersion.V0_9, ProtocolVersion.V1_0]
+        CapabilitiesOptions(
+            versions=[ProtocolVersion.V0_8, ProtocolVersion.V0_9, ProtocolVersion.V1_0]
+        )
     )
     assert caps == {
         "v0.8": {"supportedCatalogIds": ["https://a2ui.org/mock.json"]},
@@ -314,7 +317,7 @@ def test_message_processor_get_renderer_capabilities_with_options_class(
 
     # 1. With explicit versions and include_inline_catalogs
     caps = processor.get_renderer_capabilities(
-        options=CapabilitiesOptions(
+        CapabilitiesOptions(
             versions=[ProtocolVersion.V0_9, ProtocolVersion.V1_0],
             include_inline_catalogs=True,
         )
@@ -340,12 +343,15 @@ def test_message_processor_get_renderer_capabilities_with_options_class(
 
 
 def test_message_processor_capabilities_and_sync(mock_catalog):
+    from a2ui.core.processing import CapabilitiesOptions
     from a2ui.core.schema import ProtocolVersion
 
     processor = MessageProcessor(catalogs=[mock_catalog])
 
     # Check Capabilities
-    caps = processor.get_renderer_capabilities(versions=[ProtocolVersion.V0_9])
+    caps = processor.get_renderer_capabilities(
+        CapabilitiesOptions(versions=[ProtocolVersion.V0_9])
+    )
     assert caps == {
         PROTOCOL_VERSION: {"supportedCatalogIds": ["https://a2ui.org/mock.json"]}
     }

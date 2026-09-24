@@ -112,11 +112,6 @@ export interface CapabilitiesOptions {
   includeInlineCatalogs?: boolean;
   /** Protocol versions to generate capabilities for. Defaults to [this.version]. */
   versions?: ProtocolVersion[];
-  /**
-   * Protocol version to generate capabilities for.
-   * @deprecated Use `versions` instead.
-   */
-  version?: ProtocolVersion;
   /** Base schema `$ref` to wrap component definitions in inline catalogs. Defaults to 'common_types.json#/$defs/ComponentCommon'. */
   componentEnvelopeRef?: string;
 }
@@ -219,7 +214,7 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
    * @returns The capabilities object.
    */
   getRendererCapabilities(options?: CapabilitiesOptions): RendererCapabilities {
-    const versions = options?.versions ?? (options?.version ? [options.version] : [this.version]);
+    const versions = options?.versions ?? [this.version];
     const result: Record<string, any> = {
       supportedCatalogIds: this.catalogs.map(c => c.id),
     };

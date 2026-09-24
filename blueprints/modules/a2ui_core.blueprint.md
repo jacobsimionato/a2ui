@@ -529,6 +529,23 @@ Both sides advertise their capabilities to each other.
 
 Schemas live in `specification/<version>/json/`. v1.0 names the pair [`renderer_capabilities.json`](../../specification/v1_0/json/renderer_capabilities.json) and [`agent_capabilities.json`](../../specification/v1_0/json/agent_capabilities.json). v0.9 and v0.9.1 name the same pair [`client_capabilities.json`](../../specification/v0_9_1/json/client_capabilities.json) and [`server_capabilities.json`](../../specification/v0_9_1/json/server_capabilities.json), carried as `a2uiClientCapabilities` and `a2uiServerCapabilities`. v0.8 spells it differently again ([`a2ui_client_capabilities_schema.json`](../../specification/v0_8/json/a2ui_client_capabilities_schema.json)) and publishes no server-side counterpart.
 
+##### `CapabilitiesOptions`
+
+When invoking `getRendererCapabilities(options?: CapabilitiesOptions)`, the caller can configure which protocol version(s) to generate capabilities for and whether to include full inline catalog schemas:
+
+```typescript
+export interface CapabilitiesOptions {
+  /** Whether full definitions of all catalogs will be included inline. */
+  includeInlineCatalogs?: boolean;
+  /** Protocol versions to generate capabilities for. Defaults to the renderer's configured or default version(s). */
+  versions?: ProtocolVersion[];
+  /** Base schema `$ref` to wrap component definitions in inline catalogs. Defaults to 'common_types.json#/$defs/ComponentCommon'. */
+  componentEnvelopeRef?: string;
+}
+```
+
+The returned `A2uiRendererCapabilities` map contains top-level `supportedCatalogIds` alongside individual capability maps keyed by each protocol version specified in `versions` (e.g. `{"supportedCatalogIds": [...], "v0.9": {...}, "v1.0": {...}}`).
+
 #### Generating Renderer Capabilities and Schema Types
 
 To dynamically generate the `A2uiRendererCapabilities` payload (specifically `inlineCatalogs`), the processor must convert internal component schemas into valid JSON Schemas.

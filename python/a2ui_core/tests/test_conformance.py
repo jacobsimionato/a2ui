@@ -23,7 +23,11 @@ import yaml
 from a2ui.core.catalog import Catalog
 from a2ui.core.basic_catalog import v0_8, v0_9, v1_0
 from a2ui.core.schema import ProtocolVersion
-from a2ui.core.processing import MessageProcessor, MessageProcessorOptions
+from a2ui.core.processing import (
+    CapabilitiesOptions,
+    MessageProcessor,
+    MessageProcessorOptions,
+)
 from a2ui.core.validation import STRICT_VALIDATION
 from a2ui.core.exceptions import (
     A2uiError,
@@ -762,10 +766,12 @@ def validate_process_messages_case(case: dict[str, Any]) -> None:
 
 def validate_capabilities_case(case: dict[str, Any]) -> None:
     catalogs = get_catalogs_for_test_case(case)
-    processor = MessageProcessor(catalogs)
     ver = resolve_protocol_version(case) or "v0.9"
     p_ver = ProtocolVersion(ver)
-    caps = processor.get_renderer_capabilities(versions=[p_ver])
+    processor = MessageProcessor(catalogs)
+    caps = processor.get_renderer_capabilities(
+        CapabilitiesOptions(versions=[p_ver])
+    )
     expected = case.get("expect", {})
     for k, v in expected.items():
         assert k in caps
