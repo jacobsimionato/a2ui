@@ -61,14 +61,32 @@ describe('MessageProcessor', () => {
   });
 
   describe('getRendererCapabilities', () => {
+    it('throws when no protocol versions are provided', () => {
+      assert.throws(
+        () => processor.getRendererCapabilities(),
+        /At least one protocol version must be provided/,
+      );
+      assert.throws(
+        () => processor.getRendererCapabilities({} as any),
+        /At least one protocol version must be provided/,
+      );
+      assert.throws(
+        () => processor.getRendererCapabilities({versions: []}),
+        /At least one protocol version must be provided/,
+      );
+    });
+
     it('generates basic capabilities with supportedCatalogIds', () => {
-      const caps = processor.getRendererCapabilities();
+      const caps = processor.getRendererCapabilities({versions: ['v0.9']});
       assert.deepStrictEqual(caps.supportedCatalogIds, ['test-catalog']);
       assert.ok(caps['v0.9']);
     });
 
     it('includes inline catalogs when requested', () => {
-      const caps = processor.getRendererCapabilities({includeInlineCatalogs: true});
+      const caps = processor.getRendererCapabilities({
+        versions: ['v0.9'],
+        includeInlineCatalogs: true,
+      });
       assert.ok(caps.inlineCatalogs);
       assert.strictEqual(caps.inlineCatalogs.length, 1);
     });
@@ -80,6 +98,7 @@ describe('MessageProcessor', () => {
       };
       const proc = new MessageProcessor([new Catalog('cat-custom', '1.0', [strictComp])]);
       const caps = proc.getRendererCapabilities({
+        versions: ['v0.9'],
         includeInlineCatalogs: true,
         componentEnvelopeRef: 'https://example.com/schema.json#/$defs/Base',
       });
@@ -94,7 +113,10 @@ describe('MessageProcessor', () => {
       const cat = new Catalog('cat-basic', '1.0', [CardApi, RowApi, TabsApi]);
       const proc = new MessageProcessor([cat]);
 
-      const caps = proc.getRendererCapabilities({includeInlineCatalogs: true});
+      const caps = proc.getRendererCapabilities({
+        versions: ['v0.9'],
+        includeInlineCatalogs: true,
+      });
       const inlineCat = caps.inlineCatalogs?.[0] as any;
       const components = inlineCat?.components;
       assert.ok(components);
@@ -2128,8 +2150,8 @@ describe('MessageProcessor', () => {
     it('provides getClientCapabilities alias', () => {
       const cat = new Catalog('test-cat', '0.9', []);
       const proc = new MessageProcessor([cat]);
-      const caps = proc.getClientCapabilities();
-      assert.deepStrictEqual(caps, proc.getRendererCapabilities());
+      const caps = proc.getClientCapabilities({versions: ['v0.9']});
+      assert.deepStrictEqual(caps, proc.getRendererCapabilities({versions: ['v0.9']}));
       assert.deepStrictEqual(caps.supportedCatalogIds, ['test-cat']);
     });
 

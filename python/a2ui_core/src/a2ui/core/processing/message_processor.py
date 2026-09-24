@@ -232,13 +232,12 @@ class MessageProcessor:
         Returns:
             Renderer capabilities dictionary.
         """
-        opts = options or CapabilitiesOptions()
-        effective_versions = (
-            opts.versions
-            if opts.versions is not None
-            else [ProtocolVersion.V0_9]
-        )
-        effective_include_inline = opts.include_inline_catalogs
+        if not options or not options.versions:
+            raise A2uiValidationError(
+                "At least one protocol version must be provided in CapabilitiesOptions to generate renderer capabilities."
+            )
+        effective_versions = options.versions
+        effective_include_inline = options.include_inline_catalogs
 
         capabilities: dict[str, Any] = {}
         for ver in effective_versions:

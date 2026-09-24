@@ -212,7 +212,12 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
    * @returns The capabilities object.
    */
   getRendererCapabilities(options?: CapabilitiesOptions): RendererCapabilities {
-    const versions = options?.versions ?? ['v0.9'];
+    if (!options?.versions || options.versions.length === 0) {
+      throw new A2uiValidationError(
+        'At least one protocol version must be provided in CapabilitiesOptions to generate renderer capabilities.',
+      );
+    }
+    const versions = options.versions;
     const result: Record<string, any> = {
       supportedCatalogIds: this.catalogs.map(c => c.id),
     };

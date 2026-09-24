@@ -477,7 +477,7 @@ class MessageProcessor<T extends ComponentApi> {
   ): Promise<T>;
 
   // Returns a strictly typed capabilities object ready for JSON serialization
-  getRendererCapabilities(options?: CapabilitiesOptions): A2uiRendererCapabilities;
+  getRendererCapabilities(options: CapabilitiesOptions): A2uiRendererCapabilities;
 
   /**
    * Returns the aggregated data model for all surfaces that have 'sendDataModel' enabled.
@@ -530,14 +530,14 @@ Schemas live in `specification/<version>/json/`. v1.0 names the pair [`renderer_
 
 ##### `CapabilitiesOptions`
 
-When invoking `getRendererCapabilities(options?: CapabilitiesOptions)`, the caller can configure which protocol version(s) to generate capabilities for and whether to include full inline catalog schemas:
+When invoking `getRendererCapabilities(options: CapabilitiesOptions)`, at least one protocol version must be specified in `options.versions` (otherwise an `A2uiValidationError` is thrown):
 
 ```typescript
 export interface CapabilitiesOptions {
+  /** Protocol versions to generate capabilities for. Required; must contain at least one version. */
+  versions: ProtocolVersion[];
   /** Whether full definitions of all catalogs will be included inline. */
   includeInlineCatalogs?: boolean;
-  /** Protocol versions to generate capabilities for. Defaults to the renderer's configured or default version(s). */
-  versions?: ProtocolVersion[];
   /** Base schema `$ref` to wrap component definitions in inline catalogs. Defaults to 'common_types.json#/$defs/ComponentCommon'. */
   componentEnvelopeRef?: string;
 }

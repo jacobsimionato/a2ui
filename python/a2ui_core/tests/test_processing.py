@@ -310,6 +310,7 @@ def test_message_processor_get_renderer_capabilities_list_of_versions(
 def test_message_processor_get_renderer_capabilities_with_options_class(
     mock_catalog,
 ):
+    from a2ui.core.exceptions import A2uiValidationError
     from a2ui.core.processing import CapabilitiesOptions
     from a2ui.core.schema import ProtocolVersion
 
@@ -329,17 +330,13 @@ def test_message_processor_get_renderer_capabilities_with_options_class(
     assert caps["v1.0"]["supportedCatalogIds"] == ["https://a2ui.org/mock.json"]
     assert "inlineCatalogs" in caps["v1.0"]
 
-    # 2. With default CapabilitiesOptions (defaults to v0.9)
-    default_caps = processor.get_renderer_capabilities(CapabilitiesOptions())
-    assert default_caps == {
-        "v0.9": {"supportedCatalogIds": ["https://a2ui.org/mock.json"]}
-    }
+    # 2. Omitting versions or passing empty CapabilitiesOptions raises A2uiValidationError
+    with pytest.raises(A2uiValidationError, match="At least one protocol version must be provided"):
+        processor.get_renderer_capabilities(CapabilitiesOptions())
 
-    # 3. With no arguments
-    empty_caps = processor.get_renderer_capabilities()
-    assert empty_caps == {
-        "v0.9": {"supportedCatalogIds": ["https://a2ui.org/mock.json"]}
-    }
+    # 3. With no arguments raises A2uiValidationError
+    with pytest.raises(A2uiValidationError, match="At least one protocol version must be provided"):
+        processor.get_renderer_capabilities()
 
 
 def test_message_processor_capabilities_and_sync(mock_catalog):
