@@ -457,7 +457,6 @@ export interface MessageProcessorOptions {
 
 class MessageProcessor<T extends ComponentApi> {
   readonly model: SurfaceGroupModel<T>;
-  readonly version: ProtocolVersion;
   readonly rpc: RpcHandler;
 
   constructor(
@@ -484,7 +483,7 @@ class MessageProcessor<T extends ComponentApi> {
    * Returns the aggregated data model for all surfaces that have 'sendDataModel' enabled.
    * This should be used by the transport layer to populate metadata (e.g., 'A2uiRendererDataModel').
    */
-  getRendererDataModel(): A2uiRendererDataModel | undefined;
+  getRendererDataModel(version: ProtocolVersion): A2uiRendererDataModel | undefined;
 
   /** Disposes the processor, its surfaces, and all pending outbound RPC requests. */
   dispose(reason?: string): void;

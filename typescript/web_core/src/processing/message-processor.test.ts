@@ -178,7 +178,7 @@ describe('MessageProcessor', () => {
 
   describe('getRendererDataModel', () => {
     it('returns undefined when no surfaces have sendDataModel enabled', () => {
-      const model = processor.getRendererDataModel();
+      const model = processor.getRendererDataModel('v0.9');
       assert.strictEqual(model, undefined);
     });
 
@@ -196,8 +196,9 @@ describe('MessageProcessor', () => {
         },
       });
 
-      const model = processor.getRendererDataModel();
+      const model = processor.getRendererDataModel('v1.0');
       assert.ok(model);
+      assert.strictEqual(model.version, 'v1.0');
       assert.strictEqual((model as any).surfaces.s1.user.name, 'Alice');
     });
   });

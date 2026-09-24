@@ -261,7 +261,7 @@ class MessageProcessor:
         return capabilities
 
     def get_renderer_data_model(
-        self, version: str | ProtocolVersion = ProtocolVersion.V0_9
+        self, version: str | ProtocolVersion
     ) -> dict[str, Any] | None:
         """Aggregates active renderer data models for sync metadata."""
         surfaces = {}

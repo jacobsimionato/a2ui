@@ -995,7 +995,13 @@ def validate_get_renderer_data_model_case(case: dict[str, Any]) -> None:
         msgs = case.get("messages") or ([case["payload"]] if "payload" in case else [])
         if msgs:
             processor.process_messages(msgs)
-    res = processor.get_renderer_data_model()
+    args = case.get("args") or {}
+    ver = (
+        args.get("version")
+        or resolve_protocol_version(case)
+        or ProtocolVersion.V0_9
+    )
+    res = processor.get_renderer_data_model(ver)
     expected = case.get("expect")
     if expected is None and "expect" in case:
         assert res is None

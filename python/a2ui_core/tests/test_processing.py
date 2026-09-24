@@ -375,7 +375,7 @@ def test_message_processor_capabilities_and_sync(mock_catalog):
     )
 
     # Retrieve client data model sync payload
-    client_dm = processor.get_renderer_data_model()
+    client_dm = processor.get_renderer_data_model(PROTOCOL_VERSION)
     assert client_dm == {"version": PROTOCOL_VERSION, "surfaces": {"s1": {"val": 100}}}
 
 
