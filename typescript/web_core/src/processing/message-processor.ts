@@ -25,7 +25,7 @@ import {Subscription} from '../common/events.js';
 
 import {A2uiStateError, A2uiValidationError} from '../errors.js';
 import {defaultVersionAdapterFactory} from './adapters/factory.js';
-import {toCanonicalVersion} from '../common/semver.js';
+import {compareSemVer, toCanonicalVersion} from '../common/semver.js';
 import {
   InternalOperation,
   InternalCreateSurfaceOp,
@@ -229,7 +229,7 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
 
       const inlineCatalogs = options?.includeInlineCatalogs
         ? this.catalogs.map(c => {
-            if (toCanonicalVersion(ver) === '1.0') {
+            if (compareSemVer(ver, '1.0') >= 0) {
               return generateCatalogSchema(c, {
                 componentEnvelopeRef: options?.componentEnvelopeRef,
                 protocolVersion: ver,

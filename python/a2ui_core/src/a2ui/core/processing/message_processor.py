@@ -241,7 +241,9 @@ class MessageProcessor:
 
         capabilities: dict[str, Any] = {}
         for ver in effective_versions:
-            ver_obj = ver if isinstance(ver, ProtocolVersion) else ProtocolVersion(ver)
+            if not ver:
+                continue
+            ver_str = ver.value if isinstance(ver, ProtocolVersion) else str(ver)
             version_caps: dict[str, Any] = {
                 "supportedCatalogIds": [
                     cat_id
@@ -255,7 +257,7 @@ class MessageProcessor:
                     for c in self.catalogs
                     if (schema := getattr(c, "catalog_schema", None)) is not None
                 ]
-            capabilities[ver_obj.value] = version_caps
+            capabilities[ver_str] = version_caps
 
         return capabilities
 
