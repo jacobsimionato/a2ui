@@ -135,6 +135,45 @@ describe('MessageProcessor', () => {
       assert.strictEqual(typeof inlineCat.functions, 'object');
       assert.ok(!Array.isArray(inlineCat.functions));
     });
+
+    it('generates capabilities for multiple versions when versions array is provided', () => {
+      const caps = processor.getRendererCapabilities({
+        versions: ['v0.9', 'v1.0'],
+      });
+      assert.deepStrictEqual(caps.supportedCatalogIds, ['test-catalog']);
+      assert.ok(caps['v0.9']);
+      assert.ok(caps['v1.0']);
+      assert.deepStrictEqual((caps['v0.9'] as any).supportedCatalogIds, ['test-catalog']);
+      assert.deepStrictEqual((caps['v1.0'] as any).supportedCatalogIds, ['test-catalog']);
+    });
+
+    it('generates inline catalogs across multiple versions when requested', () => {
+      const greetFunc: FunctionImplementation = {
+        name: 'greet',
+        description: 'Greets user',
+        returnType: 'string',
+        schema: z.object({name: z.string()}),
+        execute: async (args: any) => `Hello, ${args.name}!`,
+      };
+      const cat = new Catalog('cat-multi', '1.0', [CardApi], [greetFunc]);
+      const proc = new MessageProcessor([cat]);
+
+      const caps = proc.getRendererCapabilities({
+        versions: ['v0.9', 'v1.0'],
+        includeInlineCatalogs: true,
+      });
+
+      assert.ok(caps.inlineCatalogs);
+      assert.ok((caps['v0.9'] as any)?.inlineCatalogs);
+      assert.ok((caps['v1.0'] as any)?.inlineCatalogs);
+      // v1.0 has dictionary functions
+      const v10Cat = (caps['v1.0'] as any).inlineCatalogs[0];
+      assert.strictEqual(typeof v10Cat.functions, 'object');
+      assert.ok(!Array.isArray(v10Cat.functions));
+      // v0.9 has array functions
+      const v09Cat = (caps['v0.9'] as any).inlineCatalogs[0];
+      assert.ok(Array.isArray(v09Cat.functions));
+    });
   });
 
   describe('getRendererDataModel', () => {

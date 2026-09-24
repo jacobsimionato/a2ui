@@ -99,6 +99,20 @@ class MessageProcessorOptions:
     default_timeout_ms: float = 30000.0
 
 
+@dataclass
+class CapabilitiesOptions:
+    """Options for generating renderer capabilities.
+
+    Attributes:
+        versions: Sequence of protocol versions to generate capabilities for.
+            Defaults to [ProtocolVersion.V0_9].
+        include_inline_catalogs: Whether full definitions of all catalogs will be included inline.
+    """
+
+    versions: Sequence[ProtocolVersion | str] | None = None
+    include_inline_catalogs: bool = False
+
+
 class MessageProcessor:
     """Core processor for handling A2UI messages, updating state, and executing operations."""
 
@@ -213,12 +227,37 @@ class MessageProcessor:
 
     def get_renderer_capabilities(
         self,
-        versions: list[ProtocolVersion],
+        options: CapabilitiesOptions | None = None,
+        *,
+        versions: Sequence[ProtocolVersion | str] | None = None,
         include_inline_catalogs: bool = False,
     ) -> dict[str, Any]:
-        """Generates renderer capabilities dictionary keyed by protocol version(s)."""
+        """Generates renderer capabilities dictionary keyed by protocol version(s).
+
+        Args:
+            options: Configuration options for capability generation.
+            versions: (Optional legacy parameter) Sequence of protocol versions.
+            include_inline_catalogs: (Optional legacy parameter) Whether to include inline catalogs.
+
+        Returns:
+            Renderer capabilities dictionary.
+        """
+        opts = options or CapabilitiesOptions(
+            versions=versions,
+            include_inline_catalogs=include_inline_catalogs,
+        )
+        effective_versions = (
+            opts.versions
+            if opts.versions is not None
+            else (versions if versions is not None else [ProtocolVersion.V0_9])
+        )
+        effective_include_inline = (
+            opts.include_inline_catalogs or include_inline_catalogs
+        )
+
         capabilities: dict[str, Any] = {}
-        for ver in versions:
+        for ver in effective_versions:
+            ver_obj = ver if isinstance(ver, ProtocolVersion) else ProtocolVersion(ver)
             version_caps: dict[str, Any] = {
                 "supportedCatalogIds": [
                     cat_id
@@ -226,13 +265,13 @@ class MessageProcessor:
                     if (cat_id := getattr(c, "catalog_id", None)) is not None
                 ]
             }
-            if include_inline_catalogs:
+            if effective_include_inline:
                 version_caps["inlineCatalogs"] = [
                     schema
                     for c in self.catalogs
                     if (schema := getattr(c, "catalog_schema", None)) is not None
                 ]
-            capabilities[ver.value] = version_caps
+            capabilities[ver_obj.value] = version_caps
 
         return capabilities
 

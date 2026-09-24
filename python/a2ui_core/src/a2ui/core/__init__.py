@@ -31,6 +31,7 @@ from a2ui.core.exceptions import (
     RpcErrorCode as RpcErrorCode,
 )
 from a2ui.core.processing import (
+    CapabilitiesOptions as CapabilitiesOptions,
     ExecutionContext as ExecutionContext,
     MessageProcessor as MessageProcessor,
     MessageProcessorOptions as MessageProcessorOptions,
@@ -58,6 +59,7 @@ __all__ = [
     "A2uiStateError",
     "A2uiValidationError",
     "CallOptions",
+    "CapabilitiesOptions",
     "Catalog",
     "DataModel",
     "ExecutionContext",

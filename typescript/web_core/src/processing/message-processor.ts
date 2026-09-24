@@ -110,7 +110,12 @@ export interface ExecutionContext {
 export interface CapabilitiesOptions {
   /** Whether full definitions of all catalogs will be included inline. */
   includeInlineCatalogs?: boolean;
-  /** Protocol version to generate capabilities for. Defaults to the processor's configured version. */
+  /** Protocol versions to generate capabilities for. Defaults to [this.version]. */
+  versions?: ProtocolVersion[];
+  /**
+   * Protocol version to generate capabilities for.
+   * @deprecated Use `versions` instead.
+   */
   version?: ProtocolVersion;
   /** Base schema `$ref` to wrap component definitions in inline catalogs. Defaults to 'common_types.json#/$defs/ComponentCommon'. */
   componentEnvelopeRef?: string;
@@ -214,36 +219,42 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
    * @returns The capabilities object.
    */
   getRendererCapabilities(options?: CapabilitiesOptions): RendererCapabilities {
-    // `version` can be used to fine-tune the returned capabilities.
-    const version = options?.version ?? this.version;
-    const versionCaps: Record<string, any> = {
+    const versions = options?.versions ?? (options?.version ? [options.version] : [this.version]);
+    const result: Record<string, any> = {
       supportedCatalogIds: this.catalogs.map(c => c.id),
     };
 
-    const inlineCatalogs = options?.includeInlineCatalogs
-      ? this.catalogs.map(c => {
-          if (toCanonicalVersion(version) === '1.0') {
-            return generateCatalogSchema(c, {
-              componentEnvelopeRef: options?.componentEnvelopeRef,
-              protocolVersion: version,
-            });
-          }
-          return this.generateLegacyInlineCatalog(
-            c,
-            options?.componentEnvelopeRef ?? 'common_types.json#/$defs/ComponentCommon',
-          );
-        })
-      : undefined;
+    for (const ver of versions) {
+      const versionCaps: Record<string, any> = {
+        supportedCatalogIds: this.catalogs.map(c => c.id),
+      };
 
-    if (inlineCatalogs) {
-      versionCaps.inlineCatalogs = inlineCatalogs;
+      const inlineCatalogs = options?.includeInlineCatalogs
+        ? this.catalogs.map(c => {
+            if (toCanonicalVersion(ver) === '1.0') {
+              return generateCatalogSchema(c, {
+                componentEnvelopeRef: options?.componentEnvelopeRef,
+                protocolVersion: ver,
+              });
+            }
+            return this.generateLegacyInlineCatalog(
+              c,
+              options?.componentEnvelopeRef ?? 'common_types.json#/$defs/ComponentCommon',
+            );
+          })
+        : undefined;
+
+      if (inlineCatalogs) {
+        versionCaps.inlineCatalogs = inlineCatalogs;
+        if (!result.inlineCatalogs) {
+          result.inlineCatalogs = inlineCatalogs;
+        }
+      }
+
+      result[ver] = versionCaps;
     }
 
-    return {
-      supportedCatalogIds: this.catalogs.map(c => c.id),
-      ...(inlineCatalogs ? {inlineCatalogs} : {}),
-      [version]: versionCaps,
-    };
+    return result as RendererCapabilities;
   }
 
   /**
