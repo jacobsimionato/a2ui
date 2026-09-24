@@ -234,7 +234,8 @@ class MessageProcessor:
         """
         if not options or not options.versions:
             raise A2uiValidationError(
-                "At least one protocol version must be provided in CapabilitiesOptions to generate renderer capabilities."
+                "At least one protocol version must be provided in CapabilitiesOptions"
+                " to generate renderer capabilities."
             )
         effective_versions = options.versions
         effective_include_inline = options.include_inline_catalogs
@@ -305,13 +306,15 @@ class MessageProcessor:
             if isinstance(s.default_catalog.protocol_version, ProtocolVersion)
             else str(s.default_catalog.protocol_version)
             for s in enabled_surfaces
-            if s.default_catalog and getattr(s.default_catalog, "protocol_version", None)
+            if s.default_catalog
+            and getattr(s.default_catalog, "protocol_version", None)
         }
 
         if len(versions_set) > 1:
             raise A2uiValidationError(
-                f"Multiple protocol versions detected among active surfaces: {sorted(versions_set)}. "
-                "Specify a target protocol version in get_renderer_data_model(version)."
+                "Multiple protocol versions detected among active surfaces:"
+                f" {sorted(versions_set)}. Specify a target protocol version in"
+                " get_renderer_data_model(version)."
             )
 
         ver_str = next(iter(versions_set)) if versions_set else "v1.0"

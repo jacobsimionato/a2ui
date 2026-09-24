@@ -769,9 +769,7 @@ def validate_capabilities_case(case: dict[str, Any]) -> None:
     ver = resolve_protocol_version(case) or "v0.9"
     p_ver = ProtocolVersion(ver)
     processor = MessageProcessor(catalogs)
-    caps = processor.get_renderer_capabilities(
-        CapabilitiesOptions(versions=[p_ver])
-    )
+    caps = processor.get_renderer_capabilities(CapabilitiesOptions(versions=[p_ver]))
     expected = case.get("expect", {})
     for k, v in expected.items():
         assert k in caps
@@ -996,11 +994,7 @@ def validate_get_renderer_data_model_case(case: dict[str, Any]) -> None:
         if msgs:
             processor.process_messages(msgs)
     args = case.get("args") or {}
-    ver = (
-        args.get("version")
-        or resolve_protocol_version(case)
-        or ProtocolVersion.V0_9
-    )
+    ver = args.get("version") or resolve_protocol_version(case) or ProtocolVersion.V0_9
     res = processor.get_renderer_data_model(ver)
     expected = case.get("expect")
     if expected is None and "expect" in case:
