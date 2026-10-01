@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'package:a2ui_core/a2ui_core.dart' show A2uiReturnType;
+import 'package:a2ui_core/a2ui_core.dart';
 
 import 'catalog_reader.dart';
 import 'types.dart';
@@ -34,9 +34,17 @@ class CatalogAnalyzer {
   /// SVG object, produces exactly that clash.
   final Set<String> _reservedNames = {};
 
-  static AnalysedCatalog analyze(CodegenCatalog catalog) {
+  static AnalysedCatalog analyze(Object catalog) {
     final analyzer = CatalogAnalyzer();
-    return analyzer.analyzeCatalog(catalog);
+    if (catalog is CodegenCatalog) {
+      return analyzer.analyzeCatalog(catalog);
+    }
+    if (catalog is Catalog) {
+      return analyzer.analyzeCatalog(CodegenCatalog(catalog));
+    }
+    throw ArgumentError(
+      'Expected Catalog or CodegenCatalog, got ${catalog.runtimeType}',
+    );
   }
 
   AnalysedCatalog analyzeCatalog(CodegenCatalog catalog) {
