@@ -172,7 +172,30 @@ class PayloadValidator<C extends ComponentApi, F extends FunctionApi> {
       );
     }
 
-    final List<ValidationError> errors = schema.validateSync(component);
+    final Map<Object?, Object?> rawProps = switch (schema.value['properties']) {
+      final Map<Object?, Object?> map => map,
+      _ => const <Object?, Object?>{},
+    };
+    final List<Object?> rawRequired = switch (schema.value['required']) {
+      final List<Object?> list => list,
+      _ => const <Object?>[],
+    };
+    final bool hasEnvelopeFields = schema.value.containsKey('allOf') ||
+        rawProps.containsKey('id') ||
+        rawProps.containsKey('component') ||
+        rawRequired.contains('id') ||
+        rawRequired.contains('component');
+    final target = hasEnvelopeFields
+        ? component
+        : <String, Object?>{
+            for (final MapEntry<String, Object?> entry in component.entries)
+              if (entry.key != 'id' &&
+                  entry.key != 'component' &&
+                  entry.key != 'catalogId')
+                entry.key: entry.value,
+          };
+
+    final List<ValidationError> errors = schema.validateSync(target);
     if (errors.isNotEmpty) {
       throw A2uiValidationError(
         "Component '${component['id']}' does not match the '$type' schema in "
@@ -243,9 +266,28 @@ class PayloadValidator<C extends ComponentApi, F extends FunctionApi> {
       _refFields ??= extractComponentRefFields(catalog);
 
   Map<String, Schema> get _resolvedComponentSchemas => _resolvedComponents ??= {
-        for (final MapEntry<String, C> entry in catalog.components.entries)
-          entry.key: _resolve(entry.value.schema),
+        for (final MapEntry<String, Object?> entry
+            in ((catalog.catalogSchema['components'] as Map?)
+                        ?.cast<String, Object?>() ??
+                    const <String, Object?>{})
+                .entries)
+          entry.key: _resolve(
+            _withEnvelopeProperties(
+              (entry.value as Map).cast<String, Object?>(),
+            ),
+          ),
       };
+
+  static Schema _withEnvelopeProperties(Map<String, Object?> schema) {
+    final copy = Map<String, Object?>.from(schema);
+    final props = Map<String, Object?>.from(
+      (copy['properties'] as Map?)?.cast<String, Object?>() ?? const {},
+    );
+    props['catalogId'] = const {'type': 'string'};
+    props['catalogID'] = const {'type': 'string'};
+    copy['properties'] = props;
+    return Schema.fromMap(copy);
+  }
 
   Map<String, Schema> get _resolvedFunctionSchemas => _resolvedFunctions ??= {
         for (final MapEntry<String, F> entry in catalog.functions.entries)
