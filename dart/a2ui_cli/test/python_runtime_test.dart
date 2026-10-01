@@ -16,9 +16,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:a2ui_cli/src/analyzer/catalog_analyzer.dart';
+import 'package:a2ui_cli/src/analyzer/catalog_reader.dart';
 import 'package:a2ui_cli/src/analyzer/types.dart';
 import 'package:a2ui_cli/src/emitters/python/python_emitter.dart';
-import 'package:a2ui_core/a2ui_core.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -108,7 +108,7 @@ void main() {
         for (final file in [...catalogFiles, File(basicCatalogPath)]) {
           final catalogJson =
               jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-          final SchemaCatalog catalog = Catalog.fromJson(catalogJson);
+          final CodegenCatalog catalog = CodegenCatalog.fromJson(catalogJson);
           final AnalysedCatalog analysed = CatalogAnalyzer.analyze(catalog);
           final emitter = PythonEmitter(analysed);
           emitter.emit(tempDir.path);

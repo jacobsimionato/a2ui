@@ -13,3 +13,10 @@
 # limitations under the License.
 
 include: ../../analysis_options.yaml
+
+analyzer:
+  errors:
+    lines_longer_than_80_chars: ignore
+    specify_nonobvious_local_variable_types: ignore
+    omit_obvious_local_variable_types: ignore
+    avoid_dynamic_calls: ignore

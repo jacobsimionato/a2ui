@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'package:a2ui_core/a2ui_core.dart';
+import 'package:a2ui_core/a2ui_core.dart' show A2uiReturnType;
 
+import 'catalog_reader.dart';
 import 'types.dart';
 
 String capitalize(String s) {
@@ -33,12 +34,12 @@ class CatalogAnalyzer {
   /// SVG object, produces exactly that clash.
   final Set<String> _reservedNames = {};
 
-  static AnalysedCatalog analyze(Catalog<ComponentApi, FunctionApi> catalog) {
+  static AnalysedCatalog analyze(CodegenCatalog catalog) {
     final analyzer = CatalogAnalyzer();
     return analyzer.analyzeCatalog(catalog);
   }
 
-  AnalysedCatalog analyzeCatalog(Catalog<ComponentApi, FunctionApi> catalog) {
+  AnalysedCatalog analyzeCatalog(CodegenCatalog catalog) {
     _enums.clear();
     _objectModels.clear();
     _reservedNames
@@ -46,20 +47,20 @@ class CatalogAnalyzer {
       ..addAll(catalog.components.keys);
 
     final components = <String, AnalysedComponentApi>{};
-    for (final MapEntry<String, ComponentApi> entry
+    for (final MapEntry<String, CatalogComponentDefinition> entry
         in catalog.components.entries) {
       components[entry.key] = _analyzeComponent(entry.key, entry.value);
     }
 
     final functions = <String, AnalysedFunctionApi>{};
-    for (final MapEntry<String, FunctionApi> entry
+    for (final MapEntry<String, CatalogFunctionDefinition> entry
         in catalog.functions.entries) {
       functions[entry.key] = _analyzeFunction(entry.key, entry.value);
     }
 
     return AnalysedCatalog(
       catalogId: catalog.id,
-      specVersion: catalog.protocolVersion,
+      specVersion: catalog.version,
       components: components,
       functions: functions,
       enums: Map.unmodifiable(_enums),
@@ -67,7 +68,10 @@ class CatalogAnalyzer {
     );
   }
 
-  AnalysedComponentApi _analyzeComponent(String name, ComponentApi comp) {
+  AnalysedComponentApi _analyzeComponent(
+    String name,
+    CatalogComponentDefinition comp,
+  ) {
     final properties = <String, PropertyDescriptor>{};
     final requiredProps = <String>[];
     var isCheckable = false;
@@ -109,7 +113,10 @@ class CatalogAnalyzer {
     );
   }
 
-  AnalysedFunctionApi _analyzeFunction(String name, FunctionApi fn) {
+  AnalysedFunctionApi _analyzeFunction(
+    String name,
+    CatalogFunctionDefinition fn,
+  ) {
     final parameters = <String, PropertyDescriptor>{};
     final requiredParams = <String>[];
 

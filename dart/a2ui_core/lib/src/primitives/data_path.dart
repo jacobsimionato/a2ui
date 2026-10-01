@@ -40,10 +40,7 @@ class DataPath {
     final List<String> segments = path
         .split('/')
         .where((s) => s.isNotEmpty)
-        .map((s) => s.replaceAllMapped(
-              RegExp(r'~([01])'),
-              (m) => m[1] == '1' ? '/' : '~',
-            ))
+        .map((s) => s.replaceAll('~1', '/').replaceAll('~0', '~'))
         .toList();
 
     for (final segment in segments) {

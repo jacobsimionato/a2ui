@@ -13,12 +13,13 @@
 // limitations under the License.
 
 import 'package:a2ui_cli/src/analyzer/catalog_analyzer.dart';
+import 'package:a2ui_cli/src/analyzer/catalog_reader.dart';
 import 'package:a2ui_cli/src/analyzer/types.dart';
-import 'package:a2ui_core/a2ui_core.dart';
+import 'package:a2ui_core/a2ui_core.dart' show A2uiReturnType;
 import 'package:test/test.dart';
 
 void main() {
-  group('Catalog.fromJson & CatalogAnalyzer', () {
+  group('CodegenCatalog.fromJson & CatalogAnalyzer', () {
     test('parses components and functions from catalog schema', () {
       final json = <String, Object?>{
         'catalogId': 'test_catalog',
@@ -68,26 +69,27 @@ void main() {
         },
       };
 
-      final SchemaCatalog catalog = Catalog.fromJson(json);
+      final CodegenCatalog catalog = CodegenCatalog.fromJson(json);
 
       expect(catalog.id, equals('test_catalog'));
-      expect(catalog.protocolVersion, equals('v0.9.1'));
+      expect(catalog.version, equals('v0.9.1'));
       expect(catalog.components.keys, containsAll(['Heading', 'ComplexCard']));
 
-      final ComponentApi heading = catalog.components['Heading']!;
+      final CatalogComponentDefinition heading = catalog.components['Heading']!;
       expect(heading.name, equals('Heading'));
       expect(heading.description, equals('A simple heading'));
       expect(heading.properties.keys, containsAll(['text', 'level']));
       expect(heading.requiredProperties, contains('text'));
 
-      final ComponentApi card = catalog.components['ComplexCard']!;
+      final CatalogComponentDefinition card =
+          catalog.components['ComplexCard']!;
       expect(card.name, equals('ComplexCard'));
       expect(card.description, equals('Card description from allOf'));
       expect(card.properties.keys, containsAll(['child', 'elevation']));
       expect(card.requiredProperties, contains('child'));
 
       expect(catalog.functions.keys, contains('openUrl'));
-      final FunctionApi fn = catalog.functions['openUrl']!;
+      final CatalogFunctionDefinition fn = catalog.functions['openUrl']!;
       expect(fn.name, equals('openUrl'));
       expect(fn.description, equals('Opens a URL'));
       expect(fn.returnType, equals(A2uiReturnType.boolean));
@@ -115,8 +117,8 @@ void main() {
         },
       };
 
-      final SchemaCatalog catalog = Catalog.fromJson(json);
-      final ComponentApi custom = catalog.components['Custom']!;
+      final CodegenCatalog catalog = CodegenCatalog.fromJson(json);
+      final CatalogComponentDefinition custom = catalog.components['Custom']!;
       expect(custom.description, equals('Resolved definition'));
       expect(custom.properties.keys, contains('foo'));
     });
@@ -135,7 +137,7 @@ void main() {
         },
       };
 
-      final SchemaCatalog catalog = Catalog.fromJson(json);
+      final CodegenCatalog catalog = CodegenCatalog.fromJson(json);
       final AnalysedCatalog analysed = CatalogAnalyzer.analyze(catalog);
       final AnalysedComponentApi box = analysed.components['NullableBox']!;
       final PropertyDescriptor labelProp = box.properties['label']!;

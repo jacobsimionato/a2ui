@@ -13,6 +13,7 @@
 // limitations under the License.
 
 export 'src/analyzer/catalog_analyzer.dart';
+export 'src/analyzer/catalog_reader.dart';
 export 'src/analyzer/types.dart';
 export 'src/cli.dart';
 export 'src/commands/codegen_command.dart';

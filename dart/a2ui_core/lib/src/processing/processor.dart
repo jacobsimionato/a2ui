@@ -484,23 +484,19 @@ class MessageProcessor<T extends ComponentApi> {
       final Map<String, dynamic> jsonSchema = entry.value.schema.toJsonMap();
       _processRefs(jsonSchema);
 
-      if (_isEnveloped(jsonSchema)) {
-        components[entry.key] = jsonSchema;
-      } else {
-        // Wrap in A2UI envelope
-        components[entry.key] = {
-          'allOf': [
-            {'\$ref': 'common_types.json#/\$defs/ComponentCommon'},
-            {
-              'properties': {
-                'component': {'const': entry.key},
-                ...?(jsonSchema['properties'] as Map<String, dynamic>?),
-              },
-              'required': ['component', ...?(jsonSchema['required'] as List?)],
+      // Wrap in A2UI envelope
+      components[entry.key] = {
+        'allOf': [
+          {'\$ref': 'common_types.json#/\$defs/ComponentCommon'},
+          {
+            'properties': {
+              'component': {'const': entry.key},
+              ...?(jsonSchema['properties'] as Map<String, dynamic>?),
             },
-          ],
-        };
-      }
+            'required': ['component', ...?(jsonSchema['required'] as List?)],
+          },
+        ],
+      };
     }
 
     final List<Map<String, Object>> functions = catalog.functions.values.map((
@@ -530,25 +526,6 @@ class MessageProcessor<T extends ComponentApi> {
     };
   }
 
-  static bool _isEnveloped(Map<String, dynamic> schema) {
-    if (schema['allOf'] is List) {
-      for (final item in schema['allOf'] as List) {
-        if (item is Map && item[r'$ref'] is String) {
-          final ref = item[r'$ref'] as String;
-          if (ref.endsWith('ComponentCommon')) return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  static String _canonicalRef(String ref) {
-    if (ref.contains('common_types.json#/\$defs/')) {
-      return 'common_types.json#/\$defs/${ref.split('#/\$defs/').last}';
-    }
-    return ref;
-  }
-
   void _processRefs(Object? node) {
     if (node is! Map) return;
 
@@ -560,15 +537,11 @@ class MessageProcessor<T extends ComponentApi> {
       final String? actualDesc = parts.length > 1 ? parts[1] : null;
 
       node.clear();
-      node['\$ref'] = _canonicalRef(ref);
-      if (actualDesc != null && actualDesc.isNotEmpty) {
+      node['\$ref'] = ref;
+      if (actualDesc != null) {
         node['description'] = actualDesc;
       }
       return;
-    }
-
-    if (node[r'$ref'] is String) {
-      node[r'$ref'] = _canonicalRef(node[r'$ref'] as String);
     }
 
     node.forEach((key, value) {

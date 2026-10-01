@@ -14,11 +14,11 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'package:a2ui_core/a2ui_core.dart';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../analyzer/catalog_analyzer.dart';
+import '../analyzer/catalog_reader.dart';
 import '../analyzer/types.dart';
 import '../emitters/python/python_emitter.dart';
 
@@ -95,7 +95,7 @@ class CodegenCommand extends Command<int> {
       return 1;
     }
 
-    final SchemaCatalog catalog = Catalog.fromJson(catalogJson);
+    final CodegenCatalog catalog = CodegenCatalog.fromJson(catalogJson);
     final AnalysedCatalog analysed = CatalogAnalyzer.analyze(catalog);
 
     final String outPath = p.canonicalize(outArg);
