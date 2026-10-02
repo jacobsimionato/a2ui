@@ -25,8 +25,7 @@ class CatalogComponentDefinition {
 
   String get name => component.name;
 
-  String? get description =>
-      component.schema.value['description'] as String?;
+  String? get description => component.schema.value['description'] as String?;
 
   Map<String, dynamic> get rawSchema => component.schema.value;
 
@@ -81,12 +80,12 @@ class CodegenCatalog {
   String get version => catalog.protocolVersion ?? 'v0.9.1';
 
   Map<String, CatalogComponentDefinition> get components => {
-        for (final c in catalog.components.values)
-          c.name: CatalogComponentDefinition(c),
-      };
+    for (final c in catalog.components.values)
+      c.name: CatalogComponentDefinition(c),
+  };
 
   Map<String, CatalogFunctionDefinition> get functions => {
-        for (final f in catalog.functions.values)
-          f.name: CatalogFunctionDefinition(f),
-      };
+    for (final f in catalog.functions.values)
+      f.name: CatalogFunctionDefinition(f),
+  };
 }
