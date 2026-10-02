@@ -13,11 +13,12 @@
 // limitations under the License.
 
 import 'package:a2ui_core/a2ui_core.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import '../catalog/component_implementation.dart';
 import '../nodes/fallback_views.dart';
 import '../nodes/node_view.dart';
+import '../theme/theme_adapter.dart';
 import 'surface_scope.dart';
 
 /// The root Flutter widget for rendering an A2UI surface.
@@ -77,12 +78,24 @@ class _A2uiSurfaceState extends State<A2uiSurface> {
     final ComponentNode<FlutterComponentImplementation>? root =
         _resolver.rootNode.value;
 
-    return A2uiSurfaceScope(
+    final Widget content = A2uiSurfaceScope(
       surface: widget.surface,
       resolver: _resolver,
       child: root == null
           ? const A2uiLoadingPlaceholder(componentId: 'root')
           : NodeView(key: ValueKey(root.instanceId), node: root),
     );
+
+    if (widget.surface.theme.isEmpty) {
+      return content;
+    }
+
+    final ThemeData baseTheme = Theme.of(context);
+    final ThemeData adaptedTheme = A2uiThemeAdapter.applyThemeTokens(
+      baseTheme,
+      widget.surface.theme,
+    );
+
+    return Theme(data: adaptedTheme, child: content);
   }
 }

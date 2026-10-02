@@ -19,7 +19,9 @@ import '../component_implementation.dart';
 import 'button.dart';
 import 'card.dart';
 import 'check_box.dart';
+import 'choice_picker.dart';
 import 'column.dart';
+import 'date_time_input.dart';
 import 'divider.dart';
 import 'icon.dart';
 import 'image.dart';
@@ -58,6 +60,8 @@ createBasicCatalog({
     flutterListImplementation,
     flutterModalImplementation,
     flutterTabsImplementation,
+    flutterChoicePickerImplementation,
+    flutterDateTimeInputImplementation,
   ];
 
   final defaultFunctions = <FunctionImplementation>[

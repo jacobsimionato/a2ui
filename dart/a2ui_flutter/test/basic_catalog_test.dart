@@ -436,5 +436,168 @@ void main() {
 
       expect(find.text('Dialog Body Content'), findsOneWidget);
     });
+
+    testWidgets('ChoicePicker single and multiple selection works', (
+      WidgetTester tester,
+    ) async {
+      final Catalog<FlutterComponentImplementation, FunctionImplementation>
+          catalog = createBasicCatalog();
+      final surface = SurfaceModel<FlutterComponentImplementation>(
+        'choice-surface',
+        catalog: catalog,
+      );
+
+      final processor = MessageProcessor<FlutterComponentImplementation>(
+        catalogs: [catalog],
+        protocolVersion: A2uiProtocolVersion.v0_9,
+      );
+      processor.groupModel.addSurface(surface);
+
+      processor.processMessages(
+        AgentToRendererMessagePayload.fromJson({
+          'version': 'v0.9',
+          'updateDataModel': {
+            'surfaceId': 'choice-surface',
+            'path': '/',
+            'value': <String, dynamic>{
+              'singleChoice': <dynamic>['opt1'],
+              'multiChoice': <dynamic>['optA'],
+            },
+          },
+        }, protocolVersion: A2uiProtocolVersion.v0_9),
+      );
+
+      processor.processMessages(
+        AgentToRendererMessagePayload.fromJson({
+          'version': 'v0.9',
+          'updateComponents': {
+            'surfaceId': 'choice-surface',
+            'components': [
+              {
+                'id': 'root',
+                'component': 'Column',
+                'children': ['single-picker', 'chips-picker'],
+              },
+              {
+                'id': 'single-picker',
+                'component': 'ChoicePicker',
+                'label': 'Select Plan',
+                'variant': 'mutuallyExclusive',
+                'displayStyle': 'checkbox',
+                'options': [
+                  {'label': 'Free Plan', 'value': 'opt1'},
+                  {'label': 'Pro Plan', 'value': 'opt2'},
+                ],
+                'value': {'path': '/singleChoice'},
+              },
+              {
+                'id': 'chips-picker',
+                'component': 'ChoicePicker',
+                'label': 'Select Features',
+                'variant': 'multipleSelection',
+                'displayStyle': 'chips',
+                'options': [
+                  {'label': 'Feature A', 'value': 'optA'},
+                  {'label': 'Feature B', 'value': 'optB'},
+                ],
+                'value': {'path': '/multiChoice'},
+              },
+            ],
+          },
+        }, protocolVersion: A2uiProtocolVersion.v0_9),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: A2uiSurface(surface: surface)),
+        ),
+      );
+
+      expect(find.text('Free Plan'), findsOneWidget);
+      expect(find.text('Pro Plan'), findsOneWidget);
+      expect(find.text('Feature A'), findsOneWidget);
+      expect(find.text('Feature B'), findsOneWidget);
+
+      // Select Pro Plan
+      await tester.tap(find.text('Pro Plan'));
+      await tester.pump();
+      expect(surface.dataModel.get('/singleChoice'), ['opt2']);
+
+      // Toggle Feature B chip
+      await tester.tap(find.text('Feature B'));
+      await tester.pump();
+      expect(surface.dataModel.get('/multiChoice'), ['optA', 'optB']);
+    });
+
+    testWidgets('DateTimeInput updates value in DataModel', (
+      WidgetTester tester,
+    ) async {
+      final Catalog<FlutterComponentImplementation, FunctionImplementation>
+          catalog = createBasicCatalog();
+      final surface = SurfaceModel<FlutterComponentImplementation>(
+        'dt-surface',
+        catalog: catalog,
+      );
+
+      final processor = MessageProcessor<FlutterComponentImplementation>(
+        catalogs: [catalog],
+        protocolVersion: A2uiProtocolVersion.v0_9,
+      );
+      processor.groupModel.addSurface(surface);
+
+      processor.processMessages(
+        AgentToRendererMessagePayload.fromJson({
+          'version': 'v0.9',
+          'updateDataModel': {
+            'surfaceId': 'dt-surface',
+            'path': '/',
+            'value': {'dateVal': '2026-01-01'},
+          },
+        }, protocolVersion: A2uiProtocolVersion.v0_9),
+      );
+
+      processor.processMessages(
+        AgentToRendererMessagePayload.fromJson({
+          'version': 'v0.9',
+          'updateComponents': {
+            'surfaceId': 'dt-surface',
+            'components': [
+              {
+                'id': 'root',
+                'component': 'DateTimeInput',
+                'label': 'Event Date',
+                'enableDate': false,
+                'enableTime': false,
+                'value': {'path': '/dateVal'},
+              },
+            ],
+          },
+        }, protocolVersion: A2uiProtocolVersion.v0_9),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: A2uiSurface(surface: surface)),
+        ),
+      );
+
+      expect(find.text('2026-01-01'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '2026-12-25');
+      await tester.pump();
+
+      expect(surface.dataModel.get('/dateVal'), '2026-12-25');
+    });
+
+    test('A2uiThemeAdapter parses colors and applies theme overrides', () {
+      final Color? color = A2uiThemeAdapter.parseHexColor('#1A73E8');
+      expect(color, isNotNull);
+      expect(color!.toARGB32(), 0xFF1A73E8);
+
+      final base = ThemeData.light();
+      final ThemeData adapted = A2uiThemeAdapter.applyThemeTokens(base, {
+        'primaryColor': '#E91E63',
+      });
+      expect(adapted.colorScheme.primary.toARGB32(), 0xFFE91E63);
+    });
   });
 }

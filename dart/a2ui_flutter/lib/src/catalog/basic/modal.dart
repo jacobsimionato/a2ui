@@ -30,10 +30,10 @@ final flutterModalImplementation = FlutterComponentImplementation(
     required: ['trigger', 'content'],
   ),
   builder: (context, node, buildChild) {
-    final ComponentNode<FlutterComponentImplementation>? trigger =
-        node.childNode('trigger');
-    final ComponentNode<FlutterComponentImplementation>? content =
-        node.childNode('content');
+    final ComponentNode<FlutterComponentImplementation>? trigger = node
+        .childNode('trigger');
+    final ComponentNode<FlutterComponentImplementation>? content = node
+        .childNode('content');
 
     if (trigger == null) return const SizedBox.shrink();
 

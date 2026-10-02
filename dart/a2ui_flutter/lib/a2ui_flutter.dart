@@ -52,7 +52,9 @@ export 'src/catalog/basic/basic_catalog.dart';
 export 'src/catalog/basic/button.dart';
 export 'src/catalog/basic/card.dart';
 export 'src/catalog/basic/check_box.dart';
+export 'src/catalog/basic/choice_picker.dart';
 export 'src/catalog/basic/column.dart';
+export 'src/catalog/basic/date_time_input.dart';
 export 'src/catalog/basic/divider.dart';
 export 'src/catalog/basic/icon.dart';
 export 'src/catalog/basic/image.dart';
@@ -72,3 +74,6 @@ export 'src/nodes/node_view.dart';
 // Surface views and ambient scope.
 export 'src/surface/a2ui_surface.dart';
 export 'src/surface/surface_scope.dart';
+
+// Theme adapter.
+export 'src/theme/theme_adapter.dart';

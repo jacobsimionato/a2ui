@@ -395,4 +395,144 @@ final List<ExplorerScenario> standardScenarios = [
       },
     ],
   ),
+  const ExplorerScenario(
+    id: 'choice-picker-demo',
+    title: '6. ChoicePicker (Chips & List)',
+    description:
+        'Single & multiple selections using chips and radio/checkbox lists.',
+    rawMessages: [
+      {
+        'version': 'v0.9',
+        'createSurface': {
+          'surfaceId': 'choice-picker-demo',
+          'catalogId': basicCatalogIdV09,
+        },
+      },
+      {
+        'version': 'v0.9',
+        'updateDataModel': {
+          'surfaceId': 'choice-picker-demo',
+          'path': '/',
+          'value': {
+            'role': ['engineer'],
+            'skills': ['flutter', 'dart'],
+          },
+        },
+      },
+      {
+        'version': 'v0.9',
+        'updateComponents': {
+          'surfaceId': 'choice-picker-demo',
+          'components': [
+            {
+              'id': 'root',
+              'component': 'Column',
+              'children': ['card-single', 'card-multi'],
+              'justify': 'start',
+              'align': 'stretch',
+            },
+            {
+              'id': 'card-single',
+              'component': 'Card',
+              'child': 'picker-single',
+            },
+            {
+              'id': 'picker-single',
+              'component': 'ChoicePicker',
+              'label': 'Select Role (Mutually Exclusive):',
+              'variant': 'mutuallyExclusive',
+              'displayStyle': 'checkbox',
+              'options': [
+                {'label': 'Software Engineer', 'value': 'engineer'},
+                {'label': 'Product Designer', 'value': 'designer'},
+                {'label': 'AI Researcher', 'value': 'researcher'},
+              ],
+              'value': {'path': '/role'},
+            },
+            {'id': 'card-multi', 'component': 'Card', 'child': 'picker-multi'},
+            {
+              'id': 'picker-multi',
+              'component': 'ChoicePicker',
+              'label': 'Skills (Filterable Chips):',
+              'variant': 'multipleSelection',
+              'displayStyle': 'chips',
+              'filterable': true,
+              'options': [
+                {'label': 'Flutter', 'value': 'flutter'},
+                {'label': 'Dart', 'value': 'dart'},
+                {'label': 'TypeScript', 'value': 'ts'},
+                {'label': 'Python', 'value': 'python'},
+                {'label': 'SwiftUI', 'value': 'swiftui'},
+              ],
+              'value': {'path': '/skills'},
+            },
+          ],
+        },
+      },
+    ],
+  ),
+  const ExplorerScenario(
+    id: 'controls-and-datetime',
+    title: '7. Controls & Date/Time',
+    description:
+        'Slider, CheckBox, and DateTimeInput inputs bound to DataModel.',
+    rawMessages: [
+      {
+        'version': 'v0.9',
+        'createSurface': {
+          'surfaceId': 'controls-and-datetime',
+          'catalogId': basicCatalogIdV09,
+        },
+      },
+      {
+        'version': 'v0.9',
+        'updateDataModel': {
+          'surfaceId': 'controls-and-datetime',
+          'path': '/',
+          'value': {
+            'eventDate': '2026-10-15',
+            'volume': 65.0,
+            'notifications': true,
+          },
+        },
+      },
+      {
+        'version': 'v0.9',
+        'updateComponents': {
+          'surfaceId': 'controls-and-datetime',
+          'components': [
+            {
+              'id': 'root',
+              'component': 'Column',
+              'children': ['date-picker', 'volume-slider', 'notif-checkbox'],
+              'justify': 'start',
+              'align': 'stretch',
+            },
+            {
+              'id': 'date-picker',
+              'component': 'DateTimeInput',
+              'label': 'Target Launch Date',
+              'enableDate': true,
+              'enableTime': false,
+              'value': {'path': '/eventDate'},
+            },
+            {
+              'id': 'volume-slider',
+              'component': 'Slider',
+              'label': 'Notification Audio Volume (%)',
+              'min': 0.0,
+              'max': 100.0,
+              'value': {'path': '/volume'},
+            },
+            {
+              'id': 'notif-checkbox',
+              'component': 'CheckBox',
+              'label': 'Enable Real-time Push Notifications',
+              'value': {'path': '/notifications'},
+            },
+          ],
+        },
+      },
+    ],
+  ),
 ];
