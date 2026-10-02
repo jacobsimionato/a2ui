@@ -7,7 +7,7 @@ Integrate A2UI into your application using the renderer for your platform.
 | Renderer                                                     | Platform           | v0.8 | v0.9 | Status             |
 | ------------------------------------------------------------ | ------------------ | ---- | ---- | ------------------ |
 | **[React](../../../renderers/react)**                        | Web                | ✅   | ✅   | ✅ Stable          |
-| **[Lit (Web Components)](../../../renderers/lit)**           | Web                | ✅   | ✅   | ✅ Stable          |
+| **[Lit (Web Components)](../../../renderers/lit)**           | Web                | —    | ✅   | ✅ Stable          |
 | **[Angular](../../../renderers/angular)**                    | Web                | ✅   | ✅   | ✅ Stable          |
 | **[Flutter (GenUI SDK)](https://docs.flutter.dev/ai/genui)** | Mobile/Desktop/Web | ✅   | ✅   | ✅ Stable          |
 | **Jetpack Compose**                                          | Android            | —    | —    | 🚧 Planned Q2 2026 |
@@ -38,11 +38,23 @@ The shared `web_core` library provides:
 npm install @a2ui/lit @a2ui/web_core
 ```
 
-Once installed, you can use the renderer in your app. The Lit renderer uses:
+Once installed, you can use the renderer in your app. The Lit renderer provides:
 
-- **Message Processor**: Wraps the A2UI message processor.
-- **`<a2ui-surface>` component**: Renders surfaces in your app.
-- **Lit Signals**: Provides reactive state management for automatic UI updates.
+- **`MessageProcessor` (`@a2ui/web_core/v0_9`)**: Manages surfaces, reactive data bindings, and user action dispatch.
+- **`<a2ui-surface>` component (`@a2ui/lit/v0_9`)**: Renders A2UI surfaces in your app.
+- **`A2uiLitElement` & `basicCatalog` (`@a2ui/lit/v0_9`)**: Base class for custom Lit components and the built-in basic catalog.
+
+### Setup Example (v0.9)
+
+```typescript
+import {MessageProcessor} from '@a2ui/web_core/v0_9';
+import {basicCatalog} from '@a2ui/lit/v0_9';
+import '@a2ui/lit/v0_9';
+
+const processor = new MessageProcessor([basicCatalog], async action => {
+  console.log('Action dispatched:', action);
+});
+```
 
 **See working example:** [Lit shell sample](../../../samples/client/lit/shell) — Check its README for detailed run instructions.
 
@@ -165,7 +177,7 @@ When users interact with A2UI components (clicking buttons, submitting forms, et
 3. Sends the action to the agent
 4. Processes the agent's response messages
 
-See the `@a2uiaction` event handler in `#maybeRenderData` in [samples/client/lit/shell/app.ts](../../../samples/client/lit/shell/app.ts) for an example of handling button clicks and form submissions.
+See the `MessageProcessor` action callback in [samples/client/lit/shell/app.ts](../../../samples/client/lit/shell/app.ts) for an example of handling button clicks and form submissions.
 
 ## Error Handling
 

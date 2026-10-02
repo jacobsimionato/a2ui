@@ -39,11 +39,6 @@ cd ../../../../typescript/web_core
 yarn install
 yarn build
 
-# Build lit renderer
-cd ../../renderers/lit
-yarn install
-yarn build
-
 # Back to composer
 cd ../../tools/composer
 ```

@@ -68,7 +68,7 @@ For a detailed explanation of the methodology, lifecycle, and workflows, read th
 - **`renderers/`**: Framework renderers only: Lit renderer (`lit/`), Angular renderer (`angular/`), React renderer (`react/`), and markdown parser (`markdown/`).
 - **`samples/`**: Ready-to-run demo agents utilizing Python ADK (`agent/adk/`), MCP server (`agent/mcp/`), and sample clients (`client/lit/`, `client/angular/`, `client/react/`, `client/flutter/`).
 - **`swift/`**: Native Apple implementation including core state engine (`core/`), SwiftUI adapter (`swiftui/`), and sample iOS client (`sample/`).
-- **`tools/`**: Developer utility suite including visual Editor (`editor/`), visual Composer (`composer/`), payload Inspector (`inspector/`), and catalog builder (`build_catalog/`).
+- **`tools/`**: Developer utility suite including visual Composer (`composer/`) and catalog builder (`build_catalog/`).
 
 ---
 

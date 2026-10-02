@@ -23,7 +23,7 @@ To prevent this, A2UI strictly excludes `allow-same-origin` for the inner iframe
 ### The Architecture
 
 1.  **[Sandbox Proxy (`sandbox.html`)](../../../samples/client/shared/mcp_apps_inner_iframe/sandbox.html)**: An intermediate `iframe` served from the same origin. It isolates raw DOM injection from the main app while maintaining a structured JSON-RPC channel.
-    - Permissions: **Do not sandbox** in the host template (e.g., [`mcp-app.ts`](../../../samples/community/client/lit/mcp-apps-in-a2ui-sample/mcp-app.ts) or [`mcp-apps-component.ts`](../../../samples/community/client/lit/mcp-apps-in-a2ui-sample/ui/custom-components/mcp-apps-component.ts)).
+    - Permissions: **Do not sandbox** in the host template.
     - Host origin validation: Validates that messages come from the expected host origin.
 2.  **Embedded App (Inner Iframe)**: The innermost `iframe`. Injected dynamically via `srcdoc` with restricted permissions.
     - Permissions: `sandbox="allow-scripts allow-forms allow-popups allow-modals"` (**MUST NOT** include `allow-same-origin`, `allow-top-navigation`, or `allow-top-navigation-by-user-activation`).
@@ -203,48 +203,7 @@ To run the samples, ensure you have the following installed:
 > echo 'GEMINI_API_KEY=your-api-key-here' > .env
 > ```
 
-## Samples
-
-There are two primary samples demonstrating MCP Apps integration. Each sample requires running **multiple terminals** — one for each backend service and one for the client.
-
----
-
-### Sample 1: MCP App Standalone Sample (Lit Client & ADK Agent)
-
-This sample verifies the sandbox with a Lit-based client and an ADK-based A2A agent.
-
-#### Step 1: Start the Agent
-
-In a separate terminal, navigate to the agent directory and start the agent:
-
-```bash
-cd samples/agent/adk/mcp-apps-in-a2ui-sample
-uv run agent.py
-```
-
-The agent will run on `http://localhost:8000`.
-
-#### Step 2: Start the Client
-
-In a new terminal, navigate to the client directory and start the dev server (requires building the Lit renderer first):
-
-```bash
-cd samples/client/lit/mcp-apps-in-a2ui-sample
-yarn install
-yarn dev
-```
-
-The client starts at `http://localhost:5173/`.
-
-#### Step 3: Open in Browser
-
-Open your browser and navigate to `http://localhost:5173/`. You should see the A2UI interface loading the MCP App.
-
-**What to expect**: A page loading the MCP App in a sandboxed iframe. Clicking the "Call Agent Tool" button inside the iframe will trigger an action that is handled by the agent.
-
----
-
-### Sample 2: MCP Apps (Calculator + Pong) (Angular Client + MCP Server + Proxy Agent)
+## Sample: MCP Apps (Calculator + Pong) (Angular Client + MCP Server + Proxy Agent)
 
 This sample verifies the sandbox with an Angular-based client, an MCP Proxy Agent, and a remote MCP Server. It requires **three** backend processes.
 
