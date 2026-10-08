@@ -1,0 +1,85 @@
+<div class="app-layout">
+  <header class="app-header">
+    <div class="header-content">
+      <h1 class="main-title">A2UI Dual-Protocol Catalog Reuse Prototype</h1>
+      <p class="main-desc">
+        Demonstrates 100% rendering component reuse between <strong>v0.9</strong> and
+        <strong>v1.0</strong>
+        protocols in Angular, plus v1.0 multi-catalog component extension.
+      </p>
+    </div>
+    <div class="tab-controls">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'all'"
+        (click)="setTab('all')"
+        data-testid="tab-all"
+      >
+        Side-by-Side (v0.9 & v1.0)
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'v09'"
+        (click)="setTab('v09')"
+        data-testid="tab-v09"
+      >
+        v0.9 Surface Only
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'v10'"
+        (click)="setTab('v10')"
+        data-testid="tab-v10"
+      >
+        v1.0 Surface Only
+      </button>
+    </div>
+  </header>
+
+  @if (errorMessage()) {
+    <div class="error-banner" data-testid="error-banner">
+      {{ errorMessage() }}
+    </div>
+  }
+
+  <main class="surfaces-container" [class.single-col]="activeTab() !== 'all'">
+    <!-- v0.9 Surface Section -->
+    @if (activeTab() === 'all' || activeTab() === 'v09') {
+      <section class="surface-column" data-testid="v09-column">
+        <div class="column-header v09-header">
+          <span class="protocol-pill v09-pill">Protocol: v0.9</span>
+          <span class="catalog-info">Catalog: CommonCatalogV09</span>
+        </div>
+        <div class="surface-wrapper">
+          <a2ui-v09-surface surfaceId="v09-demo-surface"></a2ui-v09-surface>
+        </div>
+      </section>
+    }
+
+    <!-- v1.0 Surface Section -->
+    @if (activeTab() === 'all' || activeTab() === 'v10') {
+      <section class="surface-column" data-testid="v10-column">
+        <div class="column-header v10-header">
+          <span class="protocol-pill v10-pill">Protocol: v1.0</span>
+          <span class="catalog-info">Catalogs: CommonCatalogV10 + ExtensionCatalogV10</span>
+        </div>
+        <div class="surface-wrapper">
+          <a2ui-v09-surface surfaceId="v10-demo-surface"></a2ui-v09-surface>
+        </div>
+      </section>
+    }
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-title">Dispatched Action Log (Diagnostics):</div>
+    <div class="action-log-box" data-testid="action-log">
+      @if (dispatchedActions().length === 0) {
+        <span class="empty-log">No actions dispatched yet. Click "Submit Order" to trigger.</span>
+      } @else {
+        @for (act of dispatchedActions(); track $index) {
+          <div class="log-entry" data-testid="log-entry">{{ act }}</div>
+        }
+      }
+    </div>
+  </footer>
+</div>

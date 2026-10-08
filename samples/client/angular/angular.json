@@ -103,6 +103,56 @@
           }
         }
       }
+    },
+    "catalog-reuse": {
+      "projectType": "application",
+      "schematics": {},
+      "root": "projects/catalog-reuse",
+      "sourceRoot": "projects/catalog-reuse/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "projects/catalog-reuse/dist",
+            "browser": "projects/catalog-reuse/src/main.ts",
+            "tsConfig": "projects/catalog-reuse/tsconfig.app.json",
+            "preserveSymlinks": true,
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "projects/catalog-reuse/public"
+              }
+            ],
+            "styles": ["projects/catalog-reuse/src/styles.css"]
+          },
+          "configurations": {
+            "production": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "catalog-reuse:build:production"
+            },
+            "development": {
+              "buildTarget": "catalog-reuse:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
     }
   },
   "cli": {
