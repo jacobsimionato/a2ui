@@ -21,9 +21,9 @@ import {
   Signal as AngularSignal,
   EnvironmentInjector,
 } from '@angular/core';
-import {ComponentContext, computed} from '@a2ui/web_core/v0_9';
-import {BoundProperty, ComponentTemplate} from './types';
-import {assertAngularSignal, initializeAngularReactivity} from './reactivity';
+import { ComponentContext, computed } from '@a2ui/web_core/v0_9';
+import { BoundProperty, ComponentTemplate } from './types';
+import { assertAngularSignal, initializeAngularReactivity } from './reactivity';
 
 /** Represents a reference to a child component. */
 export interface Child {
@@ -74,16 +74,26 @@ export class ComponentBinder {
   }
 
   private bindProperty(key: string, value: any, context: ComponentContext): BoundProperty<unknown> {
+    const boundPath =
+      value && typeof value === 'object'
+        ? ((value['@path'] ?? value.path) as string | undefined)
+        : undefined;
+
     const isChildListTemplate =
-      value && typeof value === 'object' && 'componentId' in value && 'path' in value;
+      value && typeof value === 'object' && 'componentId' in value && Boolean(boundPath);
     const isBoundPath =
-      value && typeof value === 'object' && 'path' in value && !('componentId' in value);
+      value && typeof value === 'object' && Boolean(boundPath) && !('componentId' in value);
 
     const baseSignal = isChildListTemplate
       ? this.createChildListSignal(value, context)
       : context.dataContext.resolveSignal(value);
 
-    const {valueSignal, template} = this.transformStructuralSignal(key, value, baseSignal, context);
+    const { valueSignal, template } = this.transformStructuralSignal(
+      key,
+      value,
+      baseSignal,
+      context,
+    );
 
     if (valueSignal?.unsubscribe) {
       this.destroyRef.onDestroy(() => valueSignal.unsubscribe!());
@@ -93,20 +103,25 @@ export class ComponentBinder {
       value: valueSignal as AngularSignal<unknown>,
       raw: value,
       template,
-      onUpdate: isBoundPath
-        ? (newValue: unknown) => context.dataContext.set(value.path, newValue)
-        : () => {}, // No-op for non-bound values
+      onUpdate:
+        isBoundPath && boundPath
+          ? (newValue: unknown) => context.dataContext.set(boundPath, newValue)
+          : () => {}, // No-op for non-bound values
     };
   }
 
   private createChildListSignal(
-    value: {componentId: string; path: string},
+    value: { componentId: string; path?: string; '@path'?: string },
     context: ComponentContext,
   ) {
-    const listSig = context.dataContext.resolveSignal({path: value.path});
+    const boundPath = (value['@path'] ?? value.path)!;
+    const isV10 = (context.dataContext as any).isV10 ?? false;
+    const listSig = context.dataContext.resolveSignal(
+      isV10 ? { '@path': boundPath } : { path: boundPath },
+    );
     assertAngularSignal(listSig);
 
-    const listContext = context.dataContext.nested(value.path);
+    const listContext = context.dataContext.nested(boundPath);
     return computed(() => {
       const arr = listSig();
       const currentArr = Array.isArray(arr) ? arr : [];
@@ -122,7 +137,7 @@ export class ComponentBinder {
     value: any,
     valueSignal: any,
     context: ComponentContext,
-  ): {valueSignal: any; template: ComponentTemplate | undefined} {
+  ): { valueSignal: any; template: ComponentTemplate | undefined } {
     if (['child', 'trigger', 'content'].includes(key)) {
       assertAngularSignal(valueSignal);
       return {
@@ -136,19 +151,19 @@ export class ComponentBinder {
     if (key === 'children') {
       assertAngularSignal(valueSignal);
       const id = value?.componentId;
-      const path = value?.path;
-      const template = id && path ? {id, path} : undefined;
+      const path = value?.['@path'] ?? value?.path;
+      const template = id && path ? { id, path } : undefined;
       return {
         template,
         valueSignal: computed(() => {
           const val = valueSignal();
           const arr = Array.isArray(val) ? val : [];
-          return arr.map(item => this.normalizeChildItem(item, context.dataContext.path));
+          return arr.map((item) => this.normalizeChildItem(item, context.dataContext.path));
         }),
       };
     }
 
-    return {valueSignal, template: undefined};
+    return { valueSignal, template: undefined };
   }
 
   private normalizeChildItem(val: unknown, basePath: string): unknown {
@@ -156,25 +171,27 @@ export class ComponentBinder {
     if (typeof val === 'object' && 'id' in val) {
       return val;
     }
-    return {id: val, basePath};
+    return { id: val, basePath };
   }
 
   private bindChecks(
     value: unknown,
     context: ComponentContext,
-  ): {isValid: BoundProperty<unknown>; validationErrors: BoundProperty<unknown>} {
+  ): { isValid: BoundProperty<unknown>; validationErrors: BoundProperty<unknown> } {
     const checksArray = Array.isArray(value) ? value : [];
 
-    const ruleResults = checksArray.map(rule => {
+    const ruleResults = checksArray.map((rule) => {
       const condition = rule.condition ?? rule;
       const message = rule.message ?? 'Validation failed';
       const conditionSig = context.dataContext.resolveSignal(condition);
       const messageSig = context.dataContext.resolveSignal(message);
-      return {conditionSig, messageSig};
+      return { conditionSig, messageSig };
     });
 
     const isValidSignal = computed(() =>
-      ruleResults.every(r => !this.evaluateCheckRule(r.conditionSig, r.messageSig).isBlockingError),
+      ruleResults.every(
+        (r) => !this.evaluateCheckRule(r.conditionSig, r.messageSig).isBlockingError,
+      ),
     );
 
     const validationErrorsSignal = computed(() => {
@@ -205,7 +222,7 @@ export class ComponentBinder {
   private evaluateCheckRule(
     conditionSig: unknown,
     messageSig: unknown,
-  ): {isBlockingError: boolean; errorMessage: string} {
+  ): { isBlockingError: boolean; errorMessage: string } {
     assertAngularSignal(conditionSig);
     assertAngularSignal(messageSig);
     const rawResult = conditionSig();

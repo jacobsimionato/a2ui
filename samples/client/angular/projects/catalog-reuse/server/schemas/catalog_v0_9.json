@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/catalogs/common/v0_9/catalog.json",
+  "catalogId": "https://example.com/catalogs/common/v0_9/catalog.json",
+  "title": "Common Catalog (v0.9 Protocol)",
+  "description": "Catalog demonstrating shared components under A2UI v0.9 specification.",
+  "components": {
+    "ContainerCard": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "ContainerCard"},
+        "title": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "subtitle": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "badge": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "child": {"$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/Child"},
+        "children": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/ChildList"
+        }
+      },
+      "required": ["component"]
+    },
+    "SmartInput": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "SmartInput"},
+        "label": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "placeholder": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "value": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DataBinding"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/CheckRule"
+          }
+        }
+      },
+      "required": ["component", "label"]
+    },
+    "RatingSlider": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "RatingSlider"},
+        "label": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "min": {"type": "number", "default": 0},
+        "max": {"type": "number", "default": 10},
+        "value": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DataBinding"
+        }
+      },
+      "required": ["component", "label"]
+    },
+    "DynamicRepeater": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "DynamicRepeater"},
+        "title": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "children": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/ChildList"
+        }
+      },
+      "required": ["component", "children"]
+    },
+    "ActionTrigger": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "ActionTrigger"},
+        "label": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["primary", "secondary", "danger"],
+          "default": "primary"
+        },
+        "disabled": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicBoolean"
+        },
+        "action": {"$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/Action"}
+      },
+      "required": ["component", "label"]
+    },
+    "ComputedSummary": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "ComputedSummary"},
+        "title": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "greeting": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "total": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicNumber"
+        }
+      },
+      "required": ["component", "title"]
+    },
+    "StatusBadge": {
+      "type": "object",
+      "properties": {
+        "component": {"const": "StatusBadge"},
+        "text": {
+          "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
+        },
+        "variant": {"type": "string", "enum": ["success", "warning", "info"], "default": "info"}
+      },
+      "required": ["component", "text"]
+    }
+  },
+  "functions": {
+    "formatGreeting": {
+      "name": "formatGreeting",
+      "returnType": "string",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"}
+        }
+      }
+    },
+    "calculateTotal": {
+      "name": "calculateTotal",
+      "returnType": "number",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "quantity": {"type": "number"},
+          "unitPrice": {"type": "number"}
+        }
+      }
+    },
+    "checkRequired": {
+      "name": "checkRequired",
+      "returnType": "boolean",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "value": {"type": "string"}
+        }
+      }
+    }
+  }
+}
