@@ -102,6 +102,10 @@ export interface ComponentNode<
    */
   readonly isPlaceholder: boolean;
   /**
+   * Opaque transport payload forwarded from the component model (e.g. raw Protobuf instance).
+   */
+  readonly rawPayload?: unknown;
+  /**
    * Registers teardown work to run when this node is disposed.
    *
    * @param cleanup Teardown callback.
@@ -147,6 +151,10 @@ export class MutableComponentNode<TProps extends NodeProps = NodeProps> implemen
   readonly context: ComponentContext | undefined;
   readonly state: NodeState;
   readonly props: Signal<TProps>;
+
+  get rawPayload(): unknown | undefined {
+    return this.context?.componentModel?.rawPayload;
+  }
 
   private readonly _onDestroyed = new EventEmitter<void>();
   readonly onDestroyed: EventSource<void> = this._onDestroyed;

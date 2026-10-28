@@ -1029,7 +1029,14 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
   }
 
   private applyComponentUpdate(comp: Record<string, unknown>, surface: SurfaceModel<T>): void {
-    const {id, component, catalogId: _catalogId, metadata: rawMetadata, ...properties} = comp;
+    const {
+      id,
+      component,
+      catalogId: _catalogId,
+      metadata: rawMetadata,
+      rawPayload,
+      ...properties
+    } = comp;
     if (typeof id !== 'string') return;
     const metadata = extractComponentMetadata(rawMetadata);
     const targetCatalog = this.resolveComponentCatalog(comp, surface);
@@ -1047,17 +1054,28 @@ export class MessageProcessor<T extends ComponentApi = ComponentApi> {
           properties,
           targetCatalog,
           metadata,
+          rawPayload !== undefined ? rawPayload : existing.rawPayload,
         );
         surface.componentsModel.addComponent(newComponent);
       } else {
         existing.metadata = metadata;
         existing.properties = properties;
+        if (rawPayload !== undefined) {
+          existing.rawPayload = rawPayload;
+        }
       }
     } else {
       if (typeof component !== 'string' || !component) {
         throw new A2uiValidationError(`Cannot create component ${id} without a type.`);
       }
-      const newComponent = new ComponentModel(id, component, properties, targetCatalog, metadata);
+      const newComponent = new ComponentModel(
+        id,
+        component,
+        properties,
+        targetCatalog,
+        metadata,
+        rawPayload,
+      );
       surface.componentsModel.addComponent(newComponent);
     }
   }

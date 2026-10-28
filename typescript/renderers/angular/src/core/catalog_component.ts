@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import {ComponentApi} from '@a2ui/web_core/v0_9';
-import {Directive, input} from '@angular/core';
-import {ComponentApiToProps} from './types';
-import {CatalogComponentInstance} from './catalog_component_instance';
+import { ComponentApi } from '@a2ui/web_core/v0_9';
+import { Directive, input } from '@angular/core';
+import { ComponentApiToProps } from './types';
+import { CatalogComponentInstance } from './catalog_component_instance';
 
 /**
  * Base class for A2UI catalog component in Angular.
@@ -37,4 +37,5 @@ export abstract class CatalogComponent<
   readonly surfaceId = input.required<string>();
   readonly componentId = input.required<string>();
   readonly dataContextPath = input<string>('/');
+  readonly rawPayload = input<unknown>();
 }

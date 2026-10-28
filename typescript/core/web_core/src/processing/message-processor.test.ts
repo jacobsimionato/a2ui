@@ -1742,4 +1742,51 @@ describe('MessageProcessor', () => {
       }
     });
   });
+
+  describe('rawPayload forwarding', () => {
+    it('propagates rawPayload to ComponentModel on creation and update', () => {
+      const textComponentApi: ComponentApi = {
+        name: 'Text',
+        schema: z.object({text: z.string()}),
+      };
+      const base = new Catalog<ComponentApi>('base', '1.0', [textComponentApi]);
+      const proc = new MessageProcessor<ComponentApi>([base]);
+      const fakeProtoPayload = {safeResource: 'https://example.com/embed'};
+
+      proc.processMessages([
+        {version: 'v1.0', createSurface: {surfaceId: 's', catalogId: 'base'}},
+        {
+          version: 'v1.0',
+          updateComponents: {
+            surfaceId: 's',
+            components: [
+              {id: 'root', component: 'Text', text: 'hello', rawPayload: fakeProtoPayload} as any,
+            ],
+          },
+        },
+      ]);
+
+      const comp = proc.model.getSurface('s')?.componentsModel.get('root');
+      assert.strictEqual(comp?.rawPayload, fakeProtoPayload);
+
+      const updatedProtoPayload = {safeResource: 'https://example.com/updated'};
+      proc.processMessages([
+        {
+          version: 'v1.0',
+          updateComponents: {
+            surfaceId: 's',
+            components: [
+              {
+                id: 'root',
+                component: 'Text',
+                text: 'updated',
+                rawPayload: updatedProtoPayload,
+              } as any,
+            ],
+          },
+        },
+      ]);
+      assert.strictEqual(comp?.rawPayload, updatedProtoPayload);
+    });
+  });
 });
