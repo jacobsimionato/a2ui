@@ -43,6 +43,7 @@ export class ComponentModel {
     initialProperties: Record<string, any>,
     readonly catalog: Catalog<any, any>,
     public metadata?: Record<string, unknown>,
+    public rawPayload?: unknown,
   ) {
     this._properties = initialProperties;
   }
