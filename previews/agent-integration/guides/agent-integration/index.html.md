@@ -45,10 +45,8 @@ The steps below use an illustrative `OrderAgentService` class representing your 
 ```typescript
 import {
   A2uiGenerator,
-  type ActionMessage,
   type AgentToRendererMessage,
   CatalogConfig,
-  type ErrorMessage,
   ExpressFormatFactory,
   RendererState,
   type RendererToAgentMessage,
@@ -84,7 +82,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterable, Callable
 import json
-import logging
 from typing import Any
 
 from a2ui.core.basic_catalog import BasicCatalog
@@ -94,14 +91,11 @@ from a2ui.inference_formats import ExpressFormatFactory
 from a2ui.parser import A2uiPart
 from a2ui.processor import A2uiGenerator, CatalogConfig
 from a2ui.rpc import (
-    A2uiRendererActionMessage,
-    A2uiRendererErrorMessage,
     RendererToAgentMessageInput,
     RendererToAgentMessageProcessor,
 )
 from a2ui.utils import RendererState
 
-logger = logging.getLogger(__name__)
 ModelStreamFn = Callable[[str, str, str], AsyncIterable[str]]
 
 class OrderAgentService:
@@ -123,7 +117,6 @@ class OrderAgentService:
 
 ```dart
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:a2ui_agent/a2ui_agent.dart';
 import 'package:a2ui_core/a2ui_core.dart';
@@ -373,32 +366,15 @@ The stream compiles the model's output into standard A2UI wire messages (`agent_
 
 ## Step 4: Process messages from the renderer
 
-Process incoming client messages through `RendererToAgentMessageProcessor` to execute agent-hosted functions, run deterministic backend action handlers, and forward conversational events to the language model.
+Process incoming client messages through `RendererToAgentMessageProcessor` so agent-hosted functions execute deterministically while user action events prompt the language model.
 
-`RendererToAgentMessageProcessor` is the agent-side counterpart of the client's [`MessageProcessor`](../../concepts/glossary/#messageprocessor). It accepts each `v1.0` [`renderer_to_agent`](../../concepts/messages/#renderer-to-agent-messages) message (either as a typed Core SDK object in memory or as decoded JSON from a transport), validates it against the protocol schema, and routes it by message type:
-
-1. [`callAgentFunction`](../../concepts/messages/#callagentfunction-v10-only) invokes the matching catalog [`AgentFunction`](#register-agent-functions-call-renderer-functions-and-read-synced-data-models) and returns the correlated `agentFunctionResponse` in `replies` with `handled: true`.
-2. [`action`](../../concepts/messages/#action), [`error`](../../specification/v1.0/schemas/#renderer_to_agent.json/properties/error), and [`rendererFunctionResponse`](../../concepts/messages/#rendererfunctionresponse-v10-only) dispatch to optional callbacks. Returning nothing or `true` marks a message as `handled: true` without invoking the model; omitting a callback or returning `false` declines the message (`handled: false`) so your service can pass it on to `runTurn`:
+In A2UI, component [events](../../concepts/actions-and-functions/) notify the agent of user intent to prompt the model on the next turn, whereas [agent-hosted functions](#register-agent-hosted-functions) trigger deterministic backend code without an LLM round-trip. `RendererToAgentMessageProcessor` is the agent-side counterpart of the client's [`MessageProcessor`](../../concepts/glossary/#messageprocessor): when configured with your catalogs, it executes matching catalog functions for [`callAgentFunction`](../../concepts/messages/#callagentfunction-v10-only) messages (`handled: true`, returning the `agentFunctionResponse` in `replies`) and leaves [`action`](../../concepts/messages/#action) and [`error`](../../specification/v1.0/schemas/#renderer_to_agent.json/properties/error) messages unhandled (`handled: false`) so your service forwards them directly to `runTurn`:
 
 #### TypeScript
 
 ```typescript
 readonly rendererMessages = new RendererToAgentMessageProcessor({
   catalogs: [basicCatalog],
-  onAction: (message: ActionMessage) => {
-    if (message.action.name === 'archive_order') {
-      this.archiveOrder(message.action.context.orderId);
-      return true; // Handled on the backend without calling the model.
-    }
-    if (message.action.name === 'confirm_order') {
-      this.confirmOrder(message.action.context.orderId);
-    }
-    return false; // Forward to runTurn so the model updates the surface.
-  },
-  onError: (message: ErrorMessage) => {
-    console.warn('Renderer error:', message.error.code, message.error.message);
-    return false; // Forward to runTurn so the model can repair the surface.
-  },
 });
 
 async *handleRendererMessage(
@@ -411,39 +387,13 @@ async *handleRendererMessage(
     yield* this.runTurn(sessionId, JSON.stringify(message));
   }
 }
-
-private archiveOrder(_orderId: unknown): void {
-  // Update archived state in your database.
-}
-
-private confirmOrder(_orderId: unknown): void {
-  // Record order confirmation in your database.
-}
 ```
 
 #### Python
 
 ```python
   # Add to OrderAgentService.__init__:
-  # self.renderer_messages = RendererToAgentMessageProcessor(
-  #     [self.basic],
-  #     on_action=self._on_action,
-  #     on_error=self._on_error,
-  # )
-
-  def _on_action(self, message: A2uiRendererActionMessage) -> bool:
-    if message.action.name == "archive_order":
-      self._archive_order(message.action.context.get("orderId"))
-      return True  # Handled on the backend without calling the model.
-    if message.action.name == "confirm_order":
-      self._confirm_order(message.action.context.get("orderId"))
-    return False  # Forward to run_turn so the model updates the surface.
-
-  def _on_error(self, message: A2uiRendererErrorMessage) -> bool:
-    logger.warning(
-        "Renderer error %s: %s", message.error.code, message.error.message
-    )
-    return False  # Forward to run_turn so the model can repair the surface.
+  # self.renderer_messages = RendererToAgentMessageProcessor([self.basic])
 
   async def handle_renderer_message(
       self, session_id: str, message: RendererToAgentMessageInput
@@ -459,12 +409,6 @@ private confirmOrder(_orderId: unknown): void {
       )
       async for update in self.run_turn(session_id, json.dumps(payload)):
         yield update
-
-  def _archive_order(self, order_id: Any) -> None:
-    pass  # Update archived state in your database.
-
-  def _confirm_order(self, order_id: Any) -> None:
-    pass  # Record order confirmation in your database.
 ```
 
 #### Dart
@@ -472,27 +416,7 @@ private confirmOrder(_orderId: unknown): void {
 ```dart
 late final rendererMessages = RendererToAgentMessageProcessor(
   catalogs: [basic],
-  onAction: _onAction,
-  onError: _onError,
 );
-
-bool _onAction(ActionMessage message) {
-  if (message.action.name == 'archive_order') {
-    _archiveOrder(message.action.context['orderId']);
-    return true; // Handled on the backend without calling the model.
-  }
-  if (message.action.name == 'confirm_order') {
-    _confirmOrder(message.action.context['orderId']);
-  }
-  return false; // Forward to runTurn so the model updates the surface.
-}
-
-bool _onError(ErrorMessage message) {
-  stderr.writeln(
-    'Renderer error ${message.error.code}: ${message.error.message}',
-  );
-  return false; // Forward to runTurn so the model can repair the surface.
-}
 
 Stream<AgentToRendererMessage> handleRendererMessage(
   String sessionId,
@@ -505,14 +429,6 @@ Stream<AgentToRendererMessage> handleRendererMessage(
         message is RendererToAgentMessage ? message.toJson() : message;
     yield* runTurn(sessionId, jsonEncode(jsonPayload));
   }
-}
-
-void _archiveOrder(Object? orderId) {
-  // Update archived state in your database.
-}
-
-void _confirmOrder(Object? orderId) {
-  // Record order confirmation in your database.
 }
 ```
 
@@ -608,7 +524,7 @@ async function readJson(req: IncomingMessage): Promise<AgentRequestBody> {
 }
 
 // Example using @google/genai; substitute any streaming LLM SDK.
-const ai = new GoogleGenAI();
+const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
 const chats = new Map<string, Chat>();
 
 async function* callModelStream(
@@ -671,12 +587,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from google import genai
 from google.genai import types
+from google.genai.chats import AsyncChat
 
 from order_agent import OrderAgentService
 
 # Example using google-genai; substitute any streaming LLM SDK.
 ai = genai.Client()
-chats: dict[str, Any] = {}
+chats: dict[str, AsyncChat] = {}
 
 async def call_model_stream(
     session_id: str, system_prompt: str, user_message: str
@@ -943,18 +860,16 @@ Client renderers attach their supported [capabilities](../../concepts/glossary/#
 
 </details>
 
-### Register agent functions, call renderer functions, and read synced data models
+### Register agent-hosted functions
 
-Attach server-side functions to your catalog, invoke client-side functions over persistent connections, and inspect synchronized client data models when surfaces collect local input.
+Attach `AgentFunction` handlers to your catalog to run deterministic server-side operations without an LLM round-trip.
 
-1. Declare agent-hosted functions with `AgentFunction` (or bind a handler to an existing catalog declaration) and attach them to your catalog before passing it to `A2uiGenerator` and `RendererToAgentMessageProcessor` in [Step 4](#step-4-process-messages-from-the-renderer). Incoming [`callAgentFunction`](../../concepts/messages/#callagentfunction-v10-only) messages (`v1.0` only) validate arguments against the function schema and return an [`agentFunctionResponse`](../../concepts/messages/#agentfunctionresponse-v10-only) automatically.
-2. Over full-duplex transports such as WebSockets, use `RendererFunctionCalls` to emit [`callRendererFunction`](../../concepts/messages/#callrendererfunction-v10-only) messages (`v1.0` only) for functions whose `allowedCallers` permits agent calls, wiring `resolve` into `RendererToAgentMessageProcessor` so incoming `rendererFunctionResponse` messages settle the pending promise or future.
-3. When a surface is created with [`sendDataModel: true`](../../concepts/data-binding/#senddatamodel-true), the renderer attaches that surface's full [data model](../../concepts/glossary/#data-model), including local two-way input edits, under `metadata.a2uiRendererDataModel.surfaces[surfaceId]` (`metadata.a2uiClientDataModel.surfaces[surfaceId]` in `v0.9.1`) on every message it sends to the agent:
+Use `AgentFunction` for deterministic backend work (such as database updates, pricing rules, or order lookups) rather than branching on `action` event names. Attach your agent functions to the catalog before passing it to `A2uiGenerator` and `RendererToAgentMessageProcessor` in [Step 4](#step-4-process-messages-from-the-renderer); incoming [`callAgentFunction`](../../concepts/messages/#callagentfunction-v10-only) messages (`v1.0` only) validate arguments against the function schema and return an [`agentFunctionResponse`](../../concepts/messages/#agentfunctionresponse-v10-only) automatically:
 
 #### TypeScript
 
 ```typescript
-import {AgentFunction, RendererFunctionCalls, RendererToAgentMessageProcessor} from '@a2ui/agent';
+import {AgentFunction, RendererToAgentMessageProcessor} from '@a2ui/agent';
 import {basicCatalog} from '@a2ui/web_core/v1_0';
 
 export const pickupEtaFn = new AgentFunction({
@@ -975,41 +890,18 @@ export const pickupEtaFn = new AgentFunction({
 export const agentCatalog = basicCatalog.copyWith({
   agentFunctions: [pickupEtaFn],
 });
-export const rendererCalls = new RendererFunctionCalls();
-
 export const rendererMessages = new RendererToAgentMessageProcessor({
   catalogs: [agentCatalog],
-  onRendererFunctionResponse: msg => rendererCalls.resolve(msg),
 });
-
-// Invoke a renderer-hosted function over an open duplex channel:
-// const [callMsg, pendingValue] = rendererCalls.call({
-//   catalogId: customCatalog.id,
-//   name: 'readViewportWidth',
-// });
-// sendToClient(callMsg);
-// const width = await pendingValue;
-
-export function readSyncedSurfaceData(
-  surfaceId: string,
-  metadata?: Record<string, unknown>,
-): Record<string, unknown> {
-  const dm = (metadata?.a2uiRendererDataModel ?? metadata?.a2uiClientDataModel) as
-    | {surfaces?: Record<string, Record<string, unknown>>}
-    | undefined;
-  return dm?.surfaces?.[surfaceId] ?? {};
-}
 ```
 
 #### Python
 
 ```python
-from typing import Any
-
 from a2ui.core import AgentFunction
 from a2ui.core.basic_catalog import BasicCatalog
 from a2ui.core.schema import ProtocolVersion
-from a2ui.rpc import RendererFunctionCalls, RendererToAgentMessageProcessor
+from a2ui.rpc import RendererToAgentMessageProcessor
 
 pickup_eta_fn = AgentFunction(
     "lookupPickupEta",
@@ -1029,28 +921,7 @@ pickup_eta_fn = AgentFunction(
 agent_catalog = BasicCatalog(ProtocolVersion.V1_0).copy_with(
     agent_functions=[pickup_eta_fn]
 )
-renderer_calls = RendererFunctionCalls()
-
-renderer_messages = RendererToAgentMessageProcessor(
-    [agent_catalog],
-    on_renderer_function_response=renderer_calls.resolve,
-)
-
-# Invoke a renderer-hosted function over an open duplex channel:
-# call_msg, pending_value = renderer_calls.call(
-#     catalog_id=custom_catalog.catalog_id,
-#     name="readViewportWidth",
-# )
-# await send_to_client(call_msg.model_dump(by_alias=True, exclude_unset=True))
-# width = await pending_value
-
-def read_synced_surface_data(
-    surface_id: str, metadata: dict[str, Any] | None = None
-) -> dict[str, Any]:
-  dm = (metadata or {}).get("a2uiRendererDataModel") or (metadata or {}).get(
-      "a2uiClientDataModel", {}
-  )
-  return dm.get("surfaces", {}).get(surface_id, {})
+renderer_messages = RendererToAgentMessageProcessor([agent_catalog])
 ```
 
 #### Dart
@@ -1081,50 +952,23 @@ final basic = BasicCatalog.v1_0();
 final CatalogApi agentCatalog = basic
     .withFunctions<FunctionApi>(basic.functions.values)
     .copyWith(agentFunctions: [pickupEtaFn]);
-final rendererCalls = RendererFunctionCalls();
-
 final rendererMessages = RendererToAgentMessageProcessor(
   catalogs: [agentCatalog],
-  onRendererFunctionResponse: rendererCalls.resolve,
 );
-
-// Invoke a renderer-hosted function over an open duplex channel:
-// final (callMsg, pendingValue) = rendererCalls.call(
-//   catalogId: customCatalog.id,
-//   name: 'readViewportWidth',
-// );
-// sendToClient(callMsg.toJson());
-// final width = await pendingValue;
-
-Map<String, Object?> readSyncedSurfaceData(
-  String surfaceId, [
-  Map<String, Object?>? metadata,
-]) {
-  final rawDm =
-      metadata?['a2uiRendererDataModel'] ?? metadata?['a2uiClientDataModel'];
-  final surfaces = ((rawDm as Map?)?['surfaces'] as Map?)?.cast<String, Object?>();
-  return (surfaces?[surfaceId] as Map?)?.cast<String, Object?>() ?? const {};
-}
 ```
 
 <details>
-<summary>Wire format: data-model metadata and function RPCs</summary>
+<summary>Wire format: callAgentFunction and agentFunctionResponse</summary>
 
-Below are the wire envelopes for an inbound [`action`](../../concepts/messages/#action) accompanied by synchronized data-model metadata in `v1.0` and `v0.9.1`, followed by a `v1.0` [`callAgentFunction`](../../concepts/messages/#callagentfunction-v10-only) request and its [`agentFunctionResponse`](../../concepts/messages/#agentfunctionresponse-v10-only) reply:
+When the client invokes an agent-hosted function in `v1.0`, it sends [`callAgentFunction`](../../concepts/messages/#callagentfunction-v10-only) and awaits the correlated [`agentFunctionResponse`](../../concepts/messages/#agentfunctionresponse-v10-only):
 
 <SchemaChips
   items={[
     {
       version: 'v1.0',
-      label: 'renderer_to_agent.json',
-      href: '/specification/v1.0/schemas/#renderer_to_agent.json',
-      title: 'v1.0 Renderer-to-Agent Message Schema',
-    },
-    {
-      version: 'v1.0',
-      label: 'renderer_data_model.json',
-      href: '/specification/v1.0/schemas/#renderer_data_model.json',
-      title: 'v1.0 Renderer Data Model Metadata Schema',
+      label: 'callAgentFunction',
+      href: '/specification/v1.0/schemas/#renderer_to_agent.json/properties/callAgentFunction',
+      title: 'v1.0 Call Agent Function Schema',
     },
     {
       version: 'v1.0',
@@ -1132,54 +976,8 @@ Below are the wire envelopes for an inbound [`action`](../../concepts/messages/#
       href: '/specification/v1.0/schemas/#agent_to_renderer.json/$defs/AgentFunctionResponseMessage',
       title: 'v1.0 Agent Function Response Schema',
     },
-    {
-      version: 'v0.9.1',
-      label: 'client_to_server.json',
-      href: '/specification/v0.9.1/schemas/#client_to_server.json',
-      title: 'v0.9.1 Client-to-Server Message Schema',
-    },
-    {
-      version: 'v0.9.1',
-      label: 'client_data_model.json',
-      href: '/specification/v0.9.1/schemas/#client_data_model.json',
-      title: 'v0.9.1 Client Data Model Metadata Schema',
-    },
   ]}
 />
-
-#### v1.0
-
-Inbound `action` request with `a2uiRendererDataModel` transport metadata:
-
-```json
-{
-  "message": {
-    "version": "1.0",
-    "action": {
-      "name": "confirm_order",
-      "surfaceId": "order_summary",
-      "sourceComponentId": "confirm_btn",
-      "timestamp": "2026-05-01T18:30:00.000Z",
-      "context": {
-        "orderId": "ORD-4821"
-      }
-    }
-  },
-  "metadata": {
-    "a2uiRendererDataModel": {
-      "version": "1.0",
-      "surfaces": {
-        "order_summary": {
-          "orderId": "ORD-4821",
-          "summaryText": "2 items ready for pickup"
-        }
-      }
-    }
-  }
-}
-```
-
-Inbound `callAgentFunction` wire message and outbound `agentFunctionResponse` reply:
 
 ```json
 {
@@ -1206,6 +1004,189 @@ Inbound `callAgentFunction` wire message and outbound `agentFunctionResponse` re
     "value": {
       "orderId": "ORD-4821",
       "eta": "Today, 5:30 PM"
+    }
+  }
+}
+```
+
+</details>
+
+### Call renderer-side functions
+
+Invoke authorized client-side functions from the agent over a persistent duplex connection using `RendererFunctionCalls`.
+
+Over full-duplex transports such as WebSockets, `RendererFunctionCalls` builds [`callRendererFunction`](../../concepts/messages/#callrendererfunction-v10-only) messages (`v1.0` only) for catalog functions whose `allowedCallers` permits agent calls (`rendererOrAgent` or `agentOnly`). Wire its `resolve` method into `RendererToAgentMessageProcessor` so incoming [`rendererFunctionResponse`](../../concepts/messages/#rendererfunctionresponse-v10-only) messages settle the pending promise or future:
+
+#### TypeScript
+
+```typescript
+import {
+  type AgentToRendererMessage,
+  RendererFunctionCalls,
+  RendererToAgentMessageProcessor,
+} from '@a2ui/agent';
+
+const rendererCalls = new RendererFunctionCalls({catalogs: [customCatalog]});
+const rendererMessages = new RendererToAgentMessageProcessor({
+  catalogs: [customCatalog],
+  onRendererFunctionResponse: msg => rendererCalls.resolve(msg),
+});
+
+async function fetchViewportWidth(
+  sendToClient: (msg: AgentToRendererMessage) => void,
+): Promise<unknown> {
+  const [callMsg, pendingValue] = rendererCalls.call({
+    catalogId: customCatalog.id,
+    name: 'readViewportWidth',
+  });
+  sendToClient(callMsg);
+  return await pendingValue;
+}
+```
+
+#### Python
+
+```python
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+from a2ui.rpc import RendererFunctionCalls, RendererToAgentMessageProcessor
+
+renderer_calls = RendererFunctionCalls(catalogs=[custom_catalog])
+renderer_messages = RendererToAgentMessageProcessor(
+    [custom_catalog],
+    on_renderer_function_response=renderer_calls.resolve,
+)
+
+async def fetch_viewport_width(
+    send_to_client: Callable[[dict[str, Any]], Awaitable[None]],
+) -> Any:
+  call_msg, pending_value = renderer_calls.call(
+      catalog_id=custom_catalog.catalog_id,
+      name="readViewportWidth",
+  )
+  await send_to_client(call_msg.model_dump(by_alias=True, exclude_unset=True))
+  return await pending_value
+```
+
+#### Dart
+
+```dart
+import 'package:a2ui_agent/a2ui_agent.dart';
+
+final rendererCalls = RendererFunctionCalls(catalogs: [customCatalog]);
+final rendererMessages = RendererToAgentMessageProcessor(
+  catalogs: [customCatalog],
+  onRendererFunctionResponse: rendererCalls.resolve,
+);
+
+Future<Object?> fetchViewportWidth(
+  void Function(Map<String, Object?>) sendToClient,
+) async {
+  final (callMsg, pendingValue) = rendererCalls.call(
+    catalogId: customCatalog.id,
+    name: 'readViewportWidth',
+  );
+  sendToClient(callMsg.toJson());
+  return await pendingValue;
+}
+```
+
+### Read synchronized client data models
+
+Read the surface data model attached in transport metadata when a surface is created with [`sendDataModel: true`](../../concepts/data-binding/#senddatamodel-true).
+
+Two-way input components mutate the client's local [data model](../../concepts/glossary/#data-model) without sending a wire message on every keystroke. When a surface sets `sendDataModel: true`, the renderer attaches that surface's full data model under `metadata.a2uiRendererDataModel.surfaces[surfaceId]` (`metadata.a2uiClientDataModel.surfaces[surfaceId]` in `v0.9.1`) on every message it sends to the agent:
+
+#### TypeScript
+
+```typescript
+export function readSyncedSurfaceData(
+  surfaceId: string,
+  metadata?: Record<string, unknown>,
+): Record<string, unknown> {
+  const dm = (metadata?.a2uiRendererDataModel ?? metadata?.a2uiClientDataModel) as
+    | {surfaces?: Record<string, Record<string, unknown>>}
+    | undefined;
+  return dm?.surfaces?.[surfaceId] ?? {};
+}
+```
+
+#### Python
+
+```python
+from typing import Any
+
+def read_synced_surface_data(
+    surface_id: str, metadata: dict[str, Any] | None = None
+) -> dict[str, Any]:
+  dm = (metadata or {}).get("a2uiRendererDataModel") or (metadata or {}).get(
+      "a2uiClientDataModel", {}
+  )
+  return dm.get("surfaces", {}).get(surface_id, {})
+```
+
+#### Dart
+
+```dart
+Map<String, Object?> readSyncedSurfaceData(
+  String surfaceId, [
+  Map<String, Object?>? metadata,
+]) {
+  final rawDm =
+      metadata?['a2uiRendererDataModel'] ?? metadata?['a2uiClientDataModel'];
+  final surfaces = ((rawDm as Map?)?['surfaces'] as Map?)?.cast<String, Object?>();
+  return (surfaces?[surfaceId] as Map?)?.cast<String, Object?>() ?? const {};
+}
+```
+
+<details>
+<summary>Wire format: synchronized data-model metadata</summary>
+
+Below is an inbound [`action`](../../concepts/messages/#action) request accompanied by synchronized data-model metadata (`a2uiRendererDataModel` in `v1.0`, `a2uiClientDataModel` in `v0.9.1`):
+
+<SchemaChips
+  items={[
+    {
+      version: 'v1.0',
+      label: 'renderer_data_model.json',
+      href: '/specification/v1.0/schemas/#renderer_data_model.json',
+      title: 'v1.0 Renderer Data Model Metadata Schema',
+    },
+    {
+      version: 'v0.9.1',
+      label: 'client_data_model.json',
+      href: '/specification/v0.9.1/schemas/#client_data_model.json',
+      title: 'v0.9.1 Client Data Model Metadata Schema',
+    },
+  ]}
+/>
+
+#### v1.0
+
+```json
+{
+  "message": {
+    "version": "1.0",
+    "action": {
+      "name": "confirm_order",
+      "surfaceId": "order_summary",
+      "sourceComponentId": "confirm_btn",
+      "timestamp": "2026-05-01T18:30:00.000Z",
+      "context": {
+        "orderId": "ORD-4821"
+      }
+    }
+  },
+  "metadata": {
+    "a2uiRendererDataModel": {
+      "version": "1.0",
+      "surfaces": {
+        "order_summary": {
+          "orderId": "ORD-4821",
+          "summaryText": "2 items ready for pickup"
+        }
+      }
     }
   }
 }
@@ -1243,54 +1224,16 @@ Inbound `callAgentFunction` wire message and outbound `agentFunctionResponse` re
 
 </details>
 
-### Validate whole responses, customize formats, and share in-process state
+### Validate whole responses with retry
 
-Validate complete model responses atomically and customize catalog scope, inference syntax, or in-process rendering to fit your deployment architecture.
+Parse complete model responses atomically when you prefer all-or-nothing validation and self-correcting retries over incremental token streaming.
 
-When you prefer whole-response validation over incremental token streaming, parse the completed model text in a single call on the request processor. If the model invents an unknown component, omits `root`, or leaves a dangling child ID, the session state rolls back every change from that turn and raises a validation error whose message you can feed back to the model for a self-correcting retry.
-
-You can also customize catalog scope, output formatting, and state sharing:
-
-1. Prune large catalogs to the exact components and functions a workflow needs using component and function pruning transformers.
-2. Configure Express format options (such as allowed message types, default surface ID, or progressive string keys), or switch to `DirectJsonFormatFactory` if your model or fine-tuned checkpoint writes raw JSON envelopes inside `<a2ui-json>` tags (see [Inference Formats](../../concepts/inference-formats/)).
-3. In single-binary TypeScript or Dart apps where the agent and renderer share memory, pass `RendererState.of(renderer)` to `openStream` (or use `StreamedAnswer`) so validated chunks apply directly to the rendered `MessageProcessor` without serialization.
-4. In Python, compose reusable server-side component templates with `@macro` and expand them into Basic catalog primitives via [`MacroExpander`](../../concepts/glossary/#macroexpander) (see [Using Macros](../../guides/macros/)) so mobile and web clients render new composite layouts without a client release.
+If the model invents an unknown component, omits `root`, or leaves a dangling child ID, parsing the whole response leaves the session state untouched and raises an `A2uiError` whose message you can feed back to the model on a retry turn:
 
 #### TypeScript
 
 ```typescript
-import {
-  A2uiError,
-  A2uiGenerator,
-  type A2uiRequestProcessor,
-  type AgentToRendererMessage,
-  CatalogConfig,
-  ComponentPruningTransformer,
-  DirectJsonFormatFactory,
-  ExpressFormatFactory,
-} from '@a2ui/agent';
-import {basicCatalog} from '@a2ui/web_core/v1_0';
-
-export const formatFactory = new ExpressFormatFactory({
-  surfaceId: 'order_summary', // Optional (default: 'main')
-  allowedMessages: ['createSurface', 'updateComponents', 'updateDataModel'], // Optional (default: undefined)
-  progressiveKeys: ['text'], // Optional (default: ['text'])
-});
-
-// Or emit raw A2UI JSON inside <a2ui-json> tags:
-export const jsonFormatFactory = new DirectJsonFormatFactory({
-  progressiveKeys: ['text'], // Optional (default: ['text'])
-});
-
-export const prunedGenerator = new A2uiGenerator(
-  [
-    new CatalogConfig(basicCatalog, [
-      new ComponentPruningTransformer(['Card', 'Column', 'Text', 'Button']),
-    ]),
-  ],
-  undefined, // Optional examples (default: undefined)
-  formatFactory, // Optional (default: new ExpressFormatFactory())
-);
+import {A2uiError, type A2uiRequestProcessor, type AgentToRendererMessage} from '@a2ui/agent';
 
 export async function generateValidatedTurn(
   processor: A2uiRequestProcessor,
@@ -1302,9 +1245,7 @@ export async function generateValidatedTurn(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const rawText = await callLlm(prompt);
     try {
-      const parts = processor.parseResponse(rawText, {
-        wrapped: true, // Optional (default: true)
-      });
+      const parts = processor.parseResponse(rawText);
       const messages: AgentToRendererMessage[] = [];
       for (const part of parts) {
         if (part.type === 'a2ui') {
@@ -1332,39 +1273,10 @@ export async function generateValidatedTurn(
 ```python
 from collections.abc import Awaitable, Callable
 
-from a2ui.catalog_transformers import ComponentPruningTransformer
 from a2ui.core import A2uiError
-from a2ui.core.basic_catalog import BasicCatalog
-from a2ui.core.schema import ProtocolVersion
 from a2ui.core.schema.v1_0 import AgentToRendererMessage
-from a2ui.inference_formats import DirectJsonFormatFactory, ExpressFormatFactory
 from a2ui.parser import A2uiPart
-from a2ui.processor import A2uiGenerator, A2uiRequestProcessor, CatalogConfig
-
-format_factory = ExpressFormatFactory(
-    allowed_messages=["createSurface", "updateComponents", "updateDataModel"],  # Optional (default: None)
-    surface_id="order_summary",  # Optional (default: "main")
-    progressive_keys={"text"},  # Optional (default: {"text"})
-)
-
-# Or emit raw A2UI JSON inside <a2ui-json> tags:
-json_format_factory = DirectJsonFormatFactory(
-    progressive_keys={"text"},  # Optional (default: frozenset())
-)
-
-pruned_generator = A2uiGenerator(
-    catalogs=[
-        CatalogConfig(
-            catalog=BasicCatalog(ProtocolVersion.V1_0),
-            transformers=[
-                ComponentPruningTransformer(["Card", "Column", "Text", "Button"])
-            ],
-        ),
-    ],
-    examples=None,  # Optional (default: None)
-    inference_format_factory=format_factory,  # Optional (default: ExpressFormatFactory())
-    accepts_inline_catalogs=False,  # Optional (default: False)
-)
+from a2ui.processor import A2uiRequestProcessor
 
 async def generate_validated_turn(
     processor: A2uiRequestProcessor,
@@ -1376,10 +1288,7 @@ async def generate_validated_turn(
   for attempt in range(max_retries + 1):
     raw_text = await call_llm(prompt)
     try:
-      parts = processor.parse_response(
-          raw_text,
-          wrapped=True,  # Optional (default: True)
-      )
+      parts = processor.parse_response(raw_text)
       return [
           msg
           for part in parts
@@ -1403,34 +1312,6 @@ async def generate_validated_turn(
 import 'package:a2ui_agent/a2ui_agent.dart';
 import 'package:a2ui_core/a2ui_core.dart';
 
-const formatFactory = ExpressFormatFactory(
-  allowedMessages: [
-    'createSurface',
-    'updateComponents',
-    'updateDataModel',
-  ], // Optional (default: null)
-  progressiveKeys: {'text'}, // Optional (default: {'text'})
-);
-
-// Or emit raw A2UI JSON inside <a2ui-json> tags:
-const jsonFormatFactory = DirectJsonFormatFactory(
-  progressiveKeys: {'text'}, // Optional (default: const {})
-);
-
-final prunedGenerator = A2uiGenerator(
-  catalogs: [
-    CatalogConfig(
-      BasicCatalog.v1_0(),
-      transformers: [
-        ComponentPruningTransformer(['Card', 'Column', 'Text', 'Button']),
-      ],
-    ),
-  ],
-  examples: const [], // Optional (default: const [])
-  inferenceFormatFactory:
-      formatFactory, // Optional (default: ExpressFormatFactory())
-);
-
 Future<List<AgentToRendererMessage>> generateValidatedTurn(
   A2uiRequestProcessor processor,
   String userPrompt,
@@ -1441,10 +1322,7 @@ Future<List<AgentToRendererMessage>> generateValidatedTurn(
   for (var attempt = 0; attempt <= maxRetries; attempt++) {
     final rawText = await callLlm(prompt);
     try {
-      final parts = processor.parseResponse(
-        rawText,
-        wrapped: true, // Optional (default: true)
-      );
+      final parts = processor.parseResponse(rawText);
       return [
         for (final part in parts)
           if (part is A2uiPart) ...part.a2ui,
@@ -1458,6 +1336,101 @@ Future<List<AgentToRendererMessage>> generateValidatedTurn(
   }
   return const [];
 }
+```
+
+### Customize catalogs and inference formats
+
+Prune large catalogs to relevant components or customize inference format options on the generator to reduce prompt size and match your model.
+
+Attach component or function pruning transformers to `CatalogConfig` to expose only the widgets a workflow needs, and pass options to `ExpressFormatFactory` or swap to `DirectJsonFormatFactory` when a model emits raw JSON inside `<a2ui-json>` tags (see [Inference Formats](../../concepts/inference-formats/)). In Python, you can also compose server-side component templates with `@macro` and `MacroExpander` so clients render new composite layouts without a client release (see [Using Macros](../../guides/macros/)):
+
+#### TypeScript
+
+```typescript
+import {
+  A2uiGenerator,
+  CatalogConfig,
+  ComponentPruningTransformer,
+  DirectJsonFormatFactory,
+  ExpressFormatFactory,
+} from '@a2ui/agent';
+import {basicCatalog} from '@a2ui/web_core/v1_0';
+
+export const formatFactory = new ExpressFormatFactory({
+  surfaceId: 'order_summary',
+  allowedMessages: ['createSurface', 'updateComponents', 'updateDataModel'],
+});
+
+// Or emit raw A2UI JSON inside <a2ui-json> tags:
+export const jsonFormatFactory = new DirectJsonFormatFactory({
+  progressiveKeys: ['text'],
+});
+
+export const prunedGenerator = new A2uiGenerator(
+  [
+    new CatalogConfig(basicCatalog, [
+      new ComponentPruningTransformer(['Card', 'Column', 'Text', 'Button']),
+    ]),
+  ],
+  undefined,
+  formatFactory,
+);
+```
+
+#### Python
+
+```python
+from a2ui.catalog_transformers import ComponentPruningTransformer
+from a2ui.core.basic_catalog import BasicCatalog
+from a2ui.core.schema import ProtocolVersion
+from a2ui.inference_formats import DirectJsonFormatFactory, ExpressFormatFactory
+from a2ui.processor import A2uiGenerator, CatalogConfig
+
+format_factory = ExpressFormatFactory(
+    allowed_messages=["createSurface", "updateComponents", "updateDataModel"],
+    surface_id="order_summary",
+)
+
+# Or emit raw A2UI JSON inside <a2ui-json> tags:
+json_format_factory = DirectJsonFormatFactory(progressive_keys={"text"})
+
+pruned_generator = A2uiGenerator(
+    catalogs=[
+        CatalogConfig(
+            catalog=BasicCatalog(ProtocolVersion.V1_0),
+            transformers=[
+                ComponentPruningTransformer(["Card", "Column", "Text", "Button"])
+            ],
+        ),
+    ],
+    inference_format_factory=format_factory,
+)
+```
+
+#### Dart
+
+```dart
+import 'package:a2ui_agent/a2ui_agent.dart';
+import 'package:a2ui_core/a2ui_core.dart';
+
+const formatFactory = ExpressFormatFactory(
+  allowedMessages: ['createSurface', 'updateComponents', 'updateDataModel'],
+);
+
+// Or emit raw A2UI JSON inside <a2ui-json> tags:
+const jsonFormatFactory = DirectJsonFormatFactory(progressiveKeys: {'text'});
+
+final prunedGenerator = A2uiGenerator(
+  catalogs: [
+    CatalogConfig(
+      BasicCatalog.v1_0(),
+      transformers: [
+        ComponentPruningTransformer(['Card', 'Column', 'Text', 'Button']),
+      ],
+    ),
+  ],
+  inferenceFormatFactory: formatFactory,
+);
 ```
 
 ---
